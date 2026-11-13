@@ -1,0 +1,112 @@
+# Linux 0.11 HD installer (old bash: no let, no echo -e). rm/cp/mv/ln on the 0.11
+# root floppy call lstat (syscall 84), which 0.11 lacks -> "Not owner"; use dd and
+# "cat /dev/null > f" (frees the blocks, keeps an empty file) instead. Read from install.flp in drive B:
+#   dd if=/dev/fd1 of=/tmp/inst bs=1024 count=@SCRIPT_N@
+FD=/dev/fd1
+HD=/dev/hd0
+PART=/dev/hd1
+
+usage() {
+  echo "usage: sh /tmp/inst part|install|pkg|rootdev -n|--dry-run|-a|--apply"
+  echo "  part     partition $HD as one Minix partition (C,H,S = @C@,@H@,@S@), then reboot"
+  echo "  install  B=install.flp: mkfs $PART, mount it on /mnt, unpack the root tree"
+  echo "  pkg      B=pkg.flp: unpack gcc/headers/utilities, umount $PART"
+  echo "  rootdev  B=boot.flp: set ROOT_DEV=0x0301 on it"
+  echo "  -n, --dry-run  print commands only;  -a, --apply  really run"
+  exit 1
+}
+
+run() {
+  echo "+ $*"
+  if [ $DRY = 0 ]; then /bin/sh -c "$*" || { echo "FAILED: $*"; exit 1; }; fi
+}
+
+get() {
+  run "dd if=$FD of=$1 bs=1024 skip=$2 count=$3"
+}
+
+getz() {
+  run "dd if=$FD bs=1024 skip=$2 count=$3 | /tmp/compress -d > $1"
+}
+
+table() {
+  (echo p; echo q; echo q; echo q) | /tmp/fdisk $HD 2>&1 | grep "^${HD}1 "
+}
+
+[ $# = 2 ] || usage
+CMD=$1
+case "$2" in
+  -n|--dry-run) DRY=1 ;;
+  -a|--apply) DRY=0 ;;
+  *) usage ;;
+esac
+
+case $CMD in
+part)
+  get /tmp/compress @COMPRESS_O@ @COMPRESS_N@
+  run "chmod 755 /tmp/compress"
+  getz /tmp/fdisk @FDISK_O@ @FDISK_N@
+  run "chmod 755 /tmp/fdisk"
+  if [ $DRY = 0 ] && [ -n "`table`" ]; then
+    echo "${HD}1 already exists:"; table; echo "delete it with /tmp/fdisk first"; exit 1
+  fi
+  run "(echo x; echo h; echo @H@; echo s; echo @S@; echo c; echo @C@; echo r; echo n; echo p; echo 1; echo @S@; echo @LAST@; echo w; echo q; echo q; echo q) | /tmp/fdisk $HD"
+  run "sync"
+  if [ $DRY = 0 ]; then
+    echo "partition table now:"; table
+  fi
+  echo "next: reboot with boot+root floppy, B=install.flp, then:"
+  echo "  sh /tmp/inst install --apply"
+  ;;
+install)
+  [ $DRY = 1 ] || [ -f /tmp/compress ] || { echo "/tmp/compress missing: run part first"; exit 1; }
+  if [ $DRY = 0 ]; then
+    set `table`
+    BLOCKS=$5
+    [ -n "$BLOCKS" ] || { echo "no ${HD}1 in partition table"; exit 1; }
+  else
+    BLOCKS='<blocks of hd01>'
+  fi
+  run "cat /dev/null > /tmp/fdisk"
+  getz /tmp/mkfs @MKFS_O@ @MKFS_N@
+  getz /tmp/mount @MOUNT_O@ @MOUNT_N@
+  get /tmp/rootdev @ROOTDEV_O@ 1
+  run "chmod 755 /tmp/mkfs /tmp/mount"
+  run "/tmp/mkfs $PART $BLOCKS"
+  [ -d /mnt ] || run "mkdir /mnt"
+  run "/tmp/mount $PART /mnt"
+  run "cat /dev/null > /tmp/mkfs"
+  run "cat /dev/null > /tmp/mount"
+  run "mkdir /mnt/usr /mnt/usr/bin"
+  getz /mnt/usr/bin/tar @TAR_O@ @TAR_N@
+  run "chmod 755 /mnt/usr/bin/tar"
+  run "dd if=$FD bs=1024 skip=@TREE_O@ count=@TREE_N@ | /tmp/compress -d | (cd /mnt; /mnt/usr/bin/tar xvf -)"
+  run "dd if=/tmp/compress of=/mnt/usr/bin/compress"
+  run "chmod 755 /mnt/usr/bin/compress"
+  run "sync"
+  echo "next: put pkg.flp into drive B (keep $PART mounted, don't reboot), then:"
+  echo "  sh /tmp/inst pkg --apply"
+  ;;
+pkg)
+  [ $DRY = 1 ] || [ -f /mnt/usr/bin/tar ] || { echo "$PART not mounted on /mnt: run install first"; exit 1; }
+  run "dd if=$FD bs=1024 count=@PKG_N@ | /tmp/compress -d | (cd /mnt; /mnt/usr/bin/tar xvf -)"
+  run "dd if=/mnt/bin/umount of=/tmp/umount"
+  run "chmod 755 /tmp/umount"
+  run "/tmp/umount $PART"
+  run "cat /dev/null > /tmp/umount"
+  echo "next: put boot.flp into drive B, then:"
+  echo "  sh /tmp/inst rootdev --apply"
+  ;;
+rootdev)
+  [ $DRY = 1 ] || [ -f /tmp/rootdev ] || { echo "/tmp/rootdev missing: run install first"; exit 1; }
+  if [ $DRY = 0 ]; then
+    echo "boot floppy in drive B? [y/N] "; read a
+    [ "$a" = y ] || exit 1
+  fi
+  run "dd if=/tmp/rootdev of=$FD bs=1 seek=508 count=2"
+  run "sync"
+  echo "done. power off, A=boot.flp, B empty, boot."
+  ;;
+*) usage ;;
+esac
+exit 0

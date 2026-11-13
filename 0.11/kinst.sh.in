@@ -1,0 +1,37 @@
+# Linux 0.11 kernel source installer (old bash). ln/cp need lstat, which 0.11
+# lacks ("Not owner") -> copy gcc-* with dd. Read from kernel.flp in drive B:
+#   dd if=/dev/fd1 of=/tmp/kinst bs=1024 count=@SCRIPT_N@
+FD=/dev/fd1
+SRC=/usr/src/linux-0.11
+
+usage() {
+  echo "usage: sh /tmp/kinst -n|--dry-run|-a|--apply"
+  echo "  copy gcc-* to gas/gld/gar/cpp, unpack $SRC (ROOT_DEV=/dev/hd1, KBD_US)"
+  echo "  -n, --dry-run  print commands only;  -a, --apply  really run"
+  exit 1
+}
+
+run() {
+  echo "+ $*"
+  if [ $DRY = 0 ]; then /bin/sh -c "$*" || { echo "FAILED: $*"; exit 1; }; fi
+}
+
+[ $# = 1 ] || usage
+case "$1" in
+  -n|--dry-run) DRY=1 ;;
+  -a|--apply) DRY=0 ;;
+  *) usage ;;
+esac
+
+[ -f /usr/local/bin/gas ] || run "dd if=/usr/local/lib/gcc-as of=/usr/local/bin/gas; chmod 755 /usr/local/bin/gas"
+[ -f /usr/local/bin/gld ] || run "dd if=/usr/local/lib/gcc-ld of=/usr/local/bin/gld; chmod 755 /usr/local/bin/gld"
+[ -f /usr/local/bin/gar ] || run "dd if=/usr/local/lib/gcc-ar of=/usr/local/bin/gar; chmod 755 /usr/local/bin/gar"
+[ -f /usr/local/bin/cpp ] || run "dd if=/usr/local/lib/gcc-cpp of=/usr/local/bin/cpp; chmod 755 /usr/local/bin/cpp"
+[ -d /usr/src ] || run "mkdir /usr/src"
+[ -d $SRC ] && { echo "$SRC already exists, remove it first"; exit 1; }
+run "dd if=$FD bs=1024 skip=@PKG_O@ count=@PKG_N@ | compress -d | (cd /; tar xvf -)"
+run "sync"
+echo "next:"
+echo "  cd $SRC; make"
+echo "  put a blank floppy into drive B, then: dd bs=8192 if=Image of=$FD"
+exit 0
