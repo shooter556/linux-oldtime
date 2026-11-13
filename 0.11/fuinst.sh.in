@@ -1,0 +1,110 @@
+# GNU fileutils 3.1 for Linux 0.11 (old bash). Read from fu.flp in drive B:
+#   dd if=/dev/fd1 of=/tmp/fuinst bs=1024 count=@SCRIPT_N@
+# Rebuilds fileutils with the 0.11 gcc/libc (the root floppy's need lstat).
+FD=/dev/fd1
+FU=/usr/src/fileutils-3.1
+DD=$FU/src/dd
+BAK=/usr/lib/fu-orig
+PROGS="chgrp chmod chown cp dd du ginstall ln ls dir vdir mkdir mkfifo mknod mv mvdir rm rmdir touch"
+
+usage() {
+  echo "usage: sh /tmp/fuinst unpack|update|profile|build|install|fixroot -n|--dry-run|-a|--apply"
+  echo "  unpack   B=fu.flp: unpack $FU, bison to /usr/local/bin, /usr/gnu/lib"
+  echo "  update   B=fu.flp: refresh Makefile.l011, lib/posixtm.c"
+  echo "  profile  B=fu.flp: /etc/profile: 'cd \$HOME' only in login shell"
+  echo "  build    make -f Makefile.l011 in $FU"
+  echo "  install  install the new programs (old ones saved in $BAK)"
+  echo "  fixroot  B=a copy of the root floppy: replace its fileutils, delete"
+  echo "           mkswap a.out .bash_history file magic mkfifo, add fdisk mkfs"
+  echo "           mount umount mknod mvdir,"
+  echo "           copy the fixed /etc/profile"
+  echo "  -n, --dry-run  print commands only;  -a, --apply  really run"
+  exit 1
+}
+
+run() {
+  echo "+ $*"
+  if [ $DRY = 0 ]; then /bin/sh -c "$*" || { echo "FAILED: $*"; exit 1; }; fi
+}
+
+[ $# = 2 ] || usage
+CMD=$1
+case "$2" in
+  -n|--dry-run) DRY=1 ;;
+  -a|--apply) DRY=0 ;;
+  *) usage ;;
+esac
+
+case $CMD in
+unpack)
+  [ $DRY = 1 ] || [ ! -d $FU ] || { echo "$FU already exists"; exit 1; }
+  run "dd if=$FD bs=1024 skip=@PKG_O@ count=@PKG_N@ | compress -d | (cd /; tar xvf -)"
+  run "sync"
+  echo "next: sh /tmp/fuinst profile --apply"
+  ;;
+update)
+  [ $DRY = 1 ] || [ -d $FU ] || { echo "$FU missing: run unpack first"; exit 1; }
+  run "dd if=$FD of=$FU/Makefile.l011 bs=1 skip=@MK_SKIP@ count=@MK_SIZE@"
+  run "dd if=$FD of=$FU/lib/posixtm.c bs=1 skip=@PT_SKIP@ count=@PT_SIZE@"
+  run "sync"
+  echo "next: sh /tmp/fuinst build --apply"
+  ;;
+profile)
+  [ -f /etc/profile.orig ] || run "dd if=/etc/profile of=/etc/profile.orig"
+  run "dd if=$FD of=/etc/profile bs=1 skip=@PROF_SKIP@ count=@PROF_SIZE@"
+  run "sync"
+  echo "next: sh /tmp/fuinst build --apply"
+  ;;
+build)
+  if [ $DRY = 0 ]; then
+    grep PROFILED /etc/profile > /dev/null || { echo "run profile first"; exit 1; }
+  fi
+  [ -f /usr/local/bin/gar ] || run "dd if=/usr/local/lib/gcc-ar of=/usr/local/bin/gar; chmod 755 /usr/local/bin/gar"
+  run "cd $FU; PROFILED=1; export PROFILED; make -f Makefile.l011"
+  run "sync"
+  echo "next: sh /tmp/fuinst install --apply"
+  ;;
+install)
+  [ $DRY = 1 ] || [ -f $DD ] || { echo "$DD missing: run build first"; exit 1; }
+  [ -d /usr/lib ] || run "mkdir /usr/lib"
+  [ -d $BAK ] || run "mkdir $BAK"
+  for p in $PROGS; do
+    s=$p; case $p in ginstall) n=install ;; *) n=$p ;; esac
+    if [ -f /bin/$n ]; then t=/bin/$n; else t=/usr/bin/$n; fi
+    if [ -f $t ] && [ ! -f $BAK/$n ]; then run "$DD if=$t of=$BAK/$n"; fi
+    run "$DD if=$FU/src/$s of=$t"
+    run "chmod 755 $t"
+  done
+  run "sync"
+  echo "done. next (optional): B = copy of the root floppy, sh /tmp/fuinst fixroot --apply"
+  ;;
+fixroot)
+  if [ $DRY = 0 ]; then
+    [ -f $DD ] || { echo "$DD missing: run build first"; exit 1; }
+    echo "copy of the root floppy in drive B? [y/N] "; read a
+    [ "$a" = y ] || exit 1
+  fi
+  run "mount $FD /mnt"
+  run "$FU/src/rm -f /mnt/bin/mkswap /mnt/usr/root/a.out /mnt/usr/root/.bash_history /mnt/usr/bin/file /mnt/etc/magic /mnt/usr/bin/mkfifo"
+  for p in $PROGS; do
+    s=$p; case $p in ginstall) n=install ;; *) n=$p ;; esac
+    for d in bin usr/bin; do
+      if [ $DRY = 1 ] || [ -f /mnt/$d/$n ]; then run "$DD if=$FU/src/$s of=/mnt/$d/$n"; fi
+    done
+  done
+  for t in fdisk mkfs mount umount; do
+    run "$DD if=/bin/$t of=/mnt/bin/$t"
+  done
+  run "$DD if=$FU/src/mknod of=/mnt/bin/mknod"
+  run "$DD if=$FU/src/mvdir of=/mnt/usr/bin/mvdir"
+  run "chmod 755 /mnt/bin/* /mnt/usr/bin/*"
+  run "dd if=/etc/profile of=/mnt/etc/profile"
+  [ -d /mnt/mnt ] || run "mkdir /mnt/mnt"
+  run "df $FD"
+  run "umount $FD"
+  run "sync"
+  echo "done. the floppy in B is the fixed root floppy."
+  ;;
+*) usage ;;
+esac
+exit 0
