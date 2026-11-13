@@ -121,6 +121,7 @@ sh /tmp/inst rootdev --apply    # B 换 boot 盘，写 ROOT_DEV=0x0301
 dd if=/dev/fd1 of=/tmp/fuinst bs=1024 count=4
 sh /tmp/fuinst unpack --apply   # 解源码，装 bison
 sh /tmp/fuinst profile --apply  # 改 /etc/profile，见下面“遇到的坑”
+                                # 重启（只放 boot 盘），让登录 shell 读新的 profile
 sh /tmp/fuinst build --apply    # make -f Makefile.l011
 sh /tmp/fuinst install --apply  # 装到原位置，旧程序存到 /usr/lib/fu-orig
 sh /tmp/fuinst fixroot --apply  # B 换 root 盘（或它的副本）
@@ -153,6 +154,7 @@ dd bs=8192 if=Image of=/dev/fd1 # B 换一张空白盘
   PROFILED=1
   export PROFILED
   ```
+  改完要重启一次。正在运行的登录 shell 不会重新读 profile，环境里没有 `PROFILED`，编内核时 `(cd kernel; make)` 会报 `kernel: ENOENT`。`fuinst build` 自己设了 `PROFILED`，所以不重启也能编过，问题要到编内核时才出现。
 - root 盘上的 sed 基本不能用：处理稍大的文件就 out of memory 并段错误，在 `` `echo … | sed …` `` 里也什么都不输出。所以 guest 脚本里不用 sed。
 - gcc-ranlib 会调用写死路径的 `/usr/local/bin/gar`，要先从 `gcc-ar` 复制一份过去。
 - 硬盘上原来没有 `/usr/lib`。
@@ -279,6 +281,7 @@ Rebuild fileutils and repair the root diskette (booted from the hard disk, B = f
 dd if=/dev/fd1 of=/tmp/fuinst bs=1024 count=4
 sh /tmp/fuinst unpack --apply   # unpack the source, install bison
 sh /tmp/fuinst profile --apply  # fix /etc/profile, see Pitfalls
+                                # reboot (boot floppy only) so the login shell reads the new profile
 sh /tmp/fuinst build --apply    # make -f Makefile.l011
 sh /tmp/fuinst install --apply  # install in place, old programs saved in /usr/lib/fu-orig
 sh /tmp/fuinst fixroot --apply  # B = the root diskette (or a copy)
@@ -311,6 +314,7 @@ Every sub-command accepts `--dry-run` to print the commands without running them
   PROFILED=1
   export PROFILED
   ```
+  Reboot once after the change. The running login shell does not re-read the profile, so `PROFILED` is not in its environment and the kernel build fails at `(cd kernel; make)` with `kernel: ENOENT`. `fuinst build` sets `PROFILED` itself, so it works without a reboot and the problem only shows up at the kernel build.
 - The root diskette's sed is close to useless: it runs out of memory and segfaults on a moderately sized file, and prints nothing inside `` `echo … | sed …` ``. The guest scripts don't use sed.
 - gcc-ranlib runs a hard-coded `/usr/local/bin/gar`, so `gcc-ar` is copied there first.
 - The hard disk has no `/usr/lib` to begin with.
