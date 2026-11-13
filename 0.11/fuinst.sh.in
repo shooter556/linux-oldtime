@@ -13,11 +13,11 @@ usage() {
   echo "  update   B=fu.flp: refresh Makefile.l011, lib/posixtm.c"
   echo "  profile  B=fu.flp: /etc/profile: 'cd \$HOME' only in login shell"
   echo "  build    make -f Makefile.l011 in $FU"
-  echo "  install  install the new programs (old ones saved in $BAK)"
+  echo "  install  install the new programs (old ones saved in $BAK), fix /dev/null"
   echo "  fixroot  B=a copy of the root floppy: replace its fileutils, delete"
   echo "           mkswap a.out .bash_history file magic mkfifo, add fdisk mkfs"
   echo "           mount umount mknod mvdir,"
-  echo "           copy the fixed /etc/profile"
+  echo "           copy the fixed /etc/profile, fix /dev/null"
   echo "  -n, --dry-run  print commands only;  -a, --apply  really run"
   exit 1
 }
@@ -25,6 +25,11 @@ usage() {
 run() {
   echo "+ $*"
   if [ $DRY = 0 ]; then /bin/sh -c "$*" || { echo "FAILED: $*"; exit 1; }; fi
+}
+
+# rootimage-0.11's /dev/null is a regular file -> real device c 1 3
+mknull() {
+  if [ $DRY = 1 ] || [ -f $1 ]; then run "$FU/src/rm -f $1; $FU/src/mknod $1 c 1 3; chmod 666 $1"; fi
 }
 
 [ $# = 2 ] || usage
@@ -75,6 +80,7 @@ install)
     run "$DD if=$FU/src/$s of=$t"
     run "chmod 755 $t"
   done
+  mknull /dev/null
   run "sync"
   echo "done. next (optional): B = copy of the root floppy, sh /tmp/fuinst fixroot --apply"
   ;;
@@ -99,6 +105,7 @@ fixroot)
   run "$DD if=$FU/src/mvdir of=/mnt/usr/bin/mvdir"
   run "chmod 755 /mnt/bin/* /mnt/usr/bin/*"
   run "dd if=/etc/profile of=/mnt/etc/profile"
+  mknull /mnt/dev/null
   [ -d /mnt/mnt ] || run "mkdir /mnt/mnt"
   run "df $FD"
   run "umount $FD"

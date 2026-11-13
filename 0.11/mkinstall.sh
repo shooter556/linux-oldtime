@@ -71,8 +71,8 @@ sys.stdout.buffer.write(data(*inode(ino)))
 PYEOF
 }
 
-# Root tree tar: the minix root image as-is (device nodes included), /etc/rc and
-# /etc/mtab pointed at /dev/hd1, plus the bootstrap tools in /bin and an empty /mnt.
+# Root tree tar: the minix root image as-is (device nodes included), /dev/null made
+# a real device (c 1 3), /etc/rc and /etc/mtab pointed at /dev/hd1, plus the bootstrap tools in /bin and an empty /mnt.
 # tar and compress are left out: the guest runs them while extracting.
 mktree() {
     python3 -I - "$@" <<'PYEOF'
@@ -103,6 +103,9 @@ def walk(ino, path):
         mm, uu, ss, tt, gg, zz = inode(n); p = path + nm; f = mm & 0o170000
         if f == 0o040000:
             add(p, mm, uu, gg, tt, tarfile.DIRTYPE); walk(n, p + '/')
+        elif p == 'dev/null':
+            # a regular file on rootimage-0.11; make it the real null device
+            add(p, 0o20666, uu, gg, tt, tarfile.CHRTYPE, dev=(1, 3))
         elif f in (0o020000, 0o060000):
             add(p, mm, uu, gg, tt, tarfile.CHRTYPE if f == 0o020000 else tarfile.BLKTYPE,
                 dev=(zz[0] >> 8, zz[0] & 255))

@@ -48,7 +48,7 @@
 
 - 原样存放的 `compress`，以及压缩成 `.Z` 的 fdisk、mkfs、mount、tar
 - `rootdev`：要写进 boot 盘偏移 508 的两个字节（`01 03`，即 ROOT_DEV=0x0301）
-- root tree：整张 rootimage-0.11 的内容（含设备文件），在主机上用 Python 直接读 Minix 镜像打成 tar（GNU 格式）。`/etc/rc`、`/etc/mtab` 改成 `/dev/hd1`，并加上 `/mnt` 和 `bin/{fdisk,mkfs,mount,umount,mknod}`。tar 和 compress 不放进去，因为解包时它们正在运行，另外单独 dd 到 `/mnt/usr/bin`。
+- root tree：整张 rootimage-0.11 的内容（含设备文件），在主机上用 Python 直接读 Minix 镜像打成 tar（GNU 格式）。`/dev/null` 换成真正的设备文件（c 1 3），`/etc/rc`、`/etc/mtab` 改成 `/dev/hd1`，并加上 `/mnt` 和 `bin/{fdisk,mkfs,mount,umount,mknod}`。tar 和 compress 不放进去，因为解包时它们正在运行，另外单独 dd 到 `/mnt/usr/bin`。
 
 `pkg.flp`：
 
@@ -118,12 +118,12 @@ sh /tmp/inst rootdev --apply    # B 换 boot 盘，写 ROOT_DEV=0x0301
 重新编译 fileutils、修 root 盘（从硬盘启动后，B = fu.flp）：
 
 ```
-dd if=/dev/fd1 of=/tmp/fuinst bs=1024 count=4
+dd if=/dev/fd1 of=/tmp/fuinst bs=1024 count=5
 sh /tmp/fuinst unpack --apply   # 解源码，装 bison
 sh /tmp/fuinst profile --apply  # 改 /etc/profile，见下面“遇到的坑”
                                 # 重启（只放 boot 盘），让登录 shell 读新的 profile
 sh /tmp/fuinst build --apply    # make -f Makefile.l011
-sh /tmp/fuinst install --apply  # 装到原位置，旧程序存到 /usr/lib/fu-orig
+sh /tmp/fuinst install --apply  # 装到原位置，旧程序存到 /usr/lib/fu-orig；修 /dev/null
 sh /tmp/fuinst fixroot --apply  # B 换 root 盘（或它的副本）
 ```
 
@@ -132,6 +132,7 @@ sh /tmp/fuinst fixroot --apply  # B 换 root 盘（或它的副本）
 - 把 root 盘上的 fileutils 换成新编的
 - 删掉 mkswap、a.out、`.bash_history`、file、`/etc/magic`、mkfifo
 - 加上 fdisk、mkfs、mount、umount、mknod、mvdir 和 `/mnt`，并换上新的 `/etc/profile`
+- 把 `/dev/null` 换成真正的设备文件
 
 做完还剩 28 块。再删掉以前拿这张盘做根盘时留在 `/tmp` 里的文件，剩 71 块。
 
@@ -161,6 +162,7 @@ dd bs=8192 if=Image of=/dev/fd1 # B 换一张空白盘
 - 删不掉文件时，可以用 `cat /dev/null > 文件` 释放空间，用 dd 代替 cp，用 dd 复制代替 ln。新的 fileutils 装好之前只能这样。
 - 不能用 dd 覆盖正在运行的 dd 本身：0.11 是按需从文件读程序页面的，覆盖后正在运行的程序会出错。所以 `install` 一律用新编的 `src/dd` 来复制。
 - 0.11 在 open 块设备时检查软盘是否换过，所以中途换盘不会读到旧的缓存。
+- **rootimage-0.11 上的 `/dev/null` 是个普通文件**（模式 666），不是设备。写进去的东西都会留在里面，`cat /dev/null > 文件` 就会把这些内容拷过去。例如 `fuinst build` 里的 `grep PROFILED /etc/profile > /dev/null` 会把 profile 里的几行留在 `/dev/null` 里。现在 `install.flp` 解出来的就是真正的设备（c 1 3），`fuinst install` 和 `fixroot` 也会修好硬盘和 root 盘上的 `/dev/null`。用旧盘装好的系统，在装好新 fileutils 后手工修：`rm /dev/null; mknod /dev/null c 1 3; chmod 666 /dev/null`。
 
 ---
 
@@ -208,7 +210,7 @@ All are **raw**: each floppy starts with a guest script that contains the 1K-blo
 
 - `compress`, stored plain, plus fdisk, mkfs, mount and tar compressed to `.Z`
 - `rootdev`: the two bytes written at offset 508 of the boot diskette (`01 03`, i.e. ROOT_DEV=0x0301)
-- the root tree: everything on rootimage-0.11, device nodes included, read straight from the Minix image by Python on the host and packed as a GNU-format tar. `/etc/rc` and `/etc/mtab` say `/dev/hd1`, and `/mnt` plus `bin/{fdisk,mkfs,mount,umount,mknod}` are added. tar and compress are left out because they are running during the unpack; they are dd'ed into `/mnt/usr/bin` separately.
+- the root tree: everything on rootimage-0.11, device nodes included, read straight from the Minix image by Python on the host and packed as a GNU-format tar. `/dev/null` becomes a real device (c 1 3), `/etc/rc` and `/etc/mtab` say `/dev/hd1`, and `/mnt` plus `bin/{fdisk,mkfs,mount,umount,mknod}` are added. tar and compress are left out because they are running during the unpack; they are dd'ed into `/mnt/usr/bin` separately.
 
 `pkg.flp`:
 
@@ -278,12 +280,12 @@ sh /tmp/inst rootdev --apply    # B = boot diskette; write ROOT_DEV=0x0301
 Rebuild fileutils and repair the root diskette (booted from the hard disk, B = fu.flp):
 
 ```
-dd if=/dev/fd1 of=/tmp/fuinst bs=1024 count=4
+dd if=/dev/fd1 of=/tmp/fuinst bs=1024 count=5
 sh /tmp/fuinst unpack --apply   # unpack the source, install bison
 sh /tmp/fuinst profile --apply  # fix /etc/profile, see Pitfalls
                                 # reboot (boot floppy only) so the login shell reads the new profile
 sh /tmp/fuinst build --apply    # make -f Makefile.l011
-sh /tmp/fuinst install --apply  # install in place, old programs saved in /usr/lib/fu-orig
+sh /tmp/fuinst install --apply  # install in place, old programs saved in /usr/lib/fu-orig; fix /dev/null
 sh /tmp/fuinst fixroot --apply  # B = the root diskette (or a copy)
 ```
 
@@ -292,6 +294,7 @@ sh /tmp/fuinst fixroot --apply  # B = the root diskette (or a copy)
 - replaces the root diskette's fileutils with the new ones
 - deletes mkswap, a.out, `.bash_history`, file, `/etc/magic` and mkfifo
 - adds fdisk, mkfs, mount, umount, mknod, mvdir and `/mnt`, and copies in the new `/etc/profile`
+- makes `/dev/null` a real device
 
 That leaves 28 free blocks; removing the files left in `/tmp` from when the diskette served as root gives 71.
 
@@ -321,3 +324,4 @@ Every sub-command accepts `--dry-run` to print the commands without running them
 - Until the new fileutils are installed, `cat /dev/null > file` frees a file's blocks, dd replaces cp, and a dd copy replaces ln.
 - Don't overwrite the running dd with dd: 0.11 pages programs in from their files on demand, so the running copy breaks. `install` always copies with the freshly built `src/dd`.
 - 0.11 checks for a floppy change when a block device is opened, so swapping disks mid-way does not return stale cached blocks.
+- **rootimage-0.11's `/dev/null` is a regular file** (mode 666), not a device. Whatever is written to it stays there, and `cat /dev/null > file` copies it out again; e.g. `grep PROFILED /etc/profile > /dev/null` in `fuinst build` leaves the profile lines in `/dev/null`. `install.flp` now unpacks a real device (c 1 3), and `fuinst install` and `fixroot` fix `/dev/null` on the hard disk and on the root diskette. On a system installed from older floppies, fix it by hand once the new fileutils are in: `rm /dev/null; mknod /dev/null c 1 3; chmod 666 /dev/null`.

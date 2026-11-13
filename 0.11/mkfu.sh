@@ -183,7 +183,7 @@ tar --format=v7 --owner=0 --group=0 -cf "$W/pkg.tar" -C "$W" usr
 compress -c "$W/pkg.tar" > "$W/pkg.tar.Z"
 
 blocks() { echo $(( ($(stat -c%s "$1") + 1023) / 1024 )); }
-SCRIPT_N=4
+SCRIPT_N=5
 PKG_O=$SCRIPT_N PKG_N=$(blocks "$W/pkg.tar.Z")
 PROF_O=$((PKG_O + PKG_N)) PROF_SIZE=$(stat -c%s "$W/profile")
 MK_O=$((PROF_O + 1)) MK_SIZE=$(stat -c%s "$FU/Makefile.l011")
