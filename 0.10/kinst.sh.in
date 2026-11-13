@@ -1,0 +1,77 @@
+# Linux 0.10 boot/root floppy maker, run in the Linux 0.11 system (old bash).
+# Read from kernel.flp in drive B:
+#   dd if=/dev/fd1 of=/tmp/kinst bs=1024 count=@SCRIPT_N@
+FD=/dev/fd1
+SRC=/usr/src/linux-0.10
+UPD=/usr/src/update-0.10
+
+usage() {
+  echo "usage: sh /tmp/kinst src|boot|root -n|--dry-run|-a|--apply"
+  echo "  src   kernel.flp in B: unpack $SRC, $UPD, /usr/bin/cut, tr"
+  echo "        then: cd $SRC; make"
+  echo "  boot  blank floppy in B: write $SRC/Image to it"
+  echo "  root  blank floppy in B: mkfs, fill with a minimal 0.10 root"
+  echo "  -n, --dry-run  print commands only;  -a, --apply  really run"
+  exit 1
+}
+
+run() {
+  echo "+ $*"
+  if [ $DRY = 0 ]; then /bin/sh -c "$*" || { echo "FAILED: $*"; exit 1; }; fi
+}
+
+[ $# = 2 ] || usage
+case "$2" in
+  -n|--dry-run) DRY=1 ;;
+  -a|--apply) DRY=0 ;;
+  *) usage ;;
+esac
+
+case "$1" in
+src)
+  [ -d $SRC ] && { echo "$SRC already exists, remove it first"; exit 1; }
+  run "dd if=$FD bs=1024 skip=@PKG_O@ count=@PKG_N@ | compress -d | (cd /; tar xvf -)"
+  run "sync"
+  echo "next: cd $SRC; make"
+  ;;
+boot)
+  [ -f $SRC/Image ] || { echo "$SRC/Image missing, run make first"; exit 1; }
+  run "dd bs=8192 if=$SRC/Image of=$FD"
+  run "sync"
+  echo "boot floppy done"
+  ;;
+root)
+  [ -f $UPD ] || { echo "$UPD missing, run src first"; exit 1; }
+  run "mkfs $FD 1440"
+  run "mount $FD /mnt"
+  for d in bin dev etc usr usr/bin usr/root mnt tmp; do
+    run "mkdir /mnt/$d"
+  done
+  for f in /bin/sh /bin/mkfs /bin/mount /bin/umount /bin/mknod /bin/fdisk; do
+    run "cp $f /mnt$f"
+  done
+  run "cp $UPD /mnt/bin/update"
+  for f in ls cp mv mvdir rm rmdir mkdir cat dd chmod sync; do
+    run "cp /usr/bin/$f /mnt/usr/bin/$f"
+  done
+  run "chmod 755 /mnt/bin/* /mnt/usr/bin/*"
+  for f in profile passwd group; do
+    run "cp /etc/$f /mnt/etc/$f"
+  done
+  run "> /mnt/etc/mtab"
+  for i in 0 1 2 3 4 5 6 7 8; do
+    run "mknod /mnt/dev/hd$i b 3 $i"
+  done
+  run "mknod /mnt/dev/fd0 b 2 28; mknod /mnt/dev/fd1 b 2 29"
+  run "mknod /mnt/dev/tty c 5 0"
+  for i in 0 1 2 3; do
+    run "mknod /mnt/dev/tty$i c 4 $i"
+  done
+  run "mknod /mnt/dev/null c 1 3"
+  run "ls -lR /mnt"
+  run "umount $FD"
+  echo "root floppy done"
+  ;;
+*) usage ;;
+esac
+exit 0
