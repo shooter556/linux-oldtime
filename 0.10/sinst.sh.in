@@ -1,0 +1,108 @@
+# Linux 0.10 tool sources (old bash). Read from src.flp in drive B:
+#   dd if=/dev/fd1 of=/tmp/sinst bs=1024 count=@SCRIPT_N@
+# No pipelines: buffer.c 1.1 can lose updates when two processes do disk I/O.
+FD=/dev/fd1
+
+usage() {
+  echo "usage: sh /tmp/sinst PACKAGE unpack|build|install|test -n|--dry-run|-a|--apply"
+  echo "  packages: grep (grep-1.5: grep, egrep -> /usr/bin)"
+  echo "            diff (diff-1.15: diff, diff3 -> /usr/local/bin)"
+  echo "            bison (1988: bison -> /usr/local/bin, bison.* -> /usr/local/lib)"
+  echo "            fileutils (fileutils-3.1: ls cp mv rm ln ... -> /bin or /usr/bin)"
+  echo "            make (make-3.62 -> /usr/bin, old one kept as /usr/bin/make.old)"
+  echo "            sed (sed-1.13 -> /usr/bin)"
+  echo "            tar (tar-1.11.1 -> /usr/bin, old one kept as /usr/bin/tar.old)"
+  echo "            patch (patch-2.0.12u8 -> /usr/bin)"
+  echo "            more (BSD more -> /usr/bin, more.help -> /usr/lib, termcap -> /etc)"
+  echo "  unpack   B=src.flp: unpack into /usr/src"
+  echo "  build    make"
+  echo "  test     (bison only) run it on getdate.y and posixtm.y"
+  echo "  install  copy the programs to their bin directory"
+  echo "  -n, --dry-run  print commands only;  -a, --apply  really run"
+  exit 1
+}
+
+run() {
+  echo "+ $*"
+  if [ $DRY = 0 ]; then /bin/sh -c "$*" || { echo "FAILED: $*"; exit 1; }; fi
+}
+
+chunk() {
+  run "dd if=$FD of=$T bs=1024 skip=$1 seek=$2 count=$3 conv=notrunc; sync"
+}
+
+# unpack NAME "SKIP SEEK COUNT"...: read the package in 100-block pieces with a
+# sync after each, so dirty buffers never fill the cache (buffer.c 1.1 bug).
+unpack() {
+  N=$1; T=/tmp/$1.tar.Z; shift
+  [ $DRY = 1 ] || [ ! -d /usr/src/$N ] || { echo "/usr/src/$N already exists"; exit 1; }
+  [ -d /usr/src ] || run "mkdir /usr/src"
+  run "rm -f $T"
+  for c in "$@"; do chunk $c; done
+  run "compress -d < $T > /tmp/$N.tar; sync"
+  run "rm $T; sync"
+  run "cd /usr/src; tar xvf /tmp/$N.tar; sync"
+  run "rm /tmp/$N.tar; sync"
+}
+
+[ $# = 3 ] || usage
+case "$3" in
+  -n|--dry-run) DRY=1 ;;
+  -a|--apply) DRY=0 ;;
+  *) usage ;;
+esac
+
+case "$1:$2" in
+grep:unpack)  unpack grep-1.5 @GREP_C@ ;;
+grep:build)   run "cd /usr/src/grep-1.5; make CC=gcc CFLAGS='-O -DUSG -I.' grep egrep" ;;
+grep:install) run "cd /usr/src/grep-1.5; cp grep egrep /usr/bin; chmod 755 /usr/bin/grep /usr/bin/egrep; sync" ;;
+diff:unpack)  unpack diff-1.15 @DIFF_C@ ;;
+diff:build)   run "cd /usr/src/diff-1.15; make -f Makefile.dist CC='gcc -O' CFLAGS=-DUSG diff diff3" ;;
+diff:install) run "cd /usr/src/diff-1.15; cp diff diff3 /usr/local/bin; chmod 755 /usr/local/bin/diff /usr/local/bin/diff3; sync" ;;
+bison:unpack)  unpack bison-1988 @BISON_C@ ;;
+bison:build)
+  # the Makefile links with -g, which makes gcc 1.40 want libg.a (not in gccbin)
+  o="LR0.o allocate.o closure.o conflicts.o derives.o files.o getargs.o gram.o lalr.o lex.o main.o nullable.o output.o print.o reader.o symtab.o warshall.o"
+  run "cd /usr/src/bison-1988; make CC=gcc CFLAGS=-O PARSERDIR=/usr/local/lib $o"
+  run "cd /usr/src/bison-1988; gcc -o bison $o" ;;
+bison:install) run "cd /usr/src/bison-1988; cp bison /usr/local/bin; chmod 755 /usr/local/bin/bison; cp bison.simple bison.hairy /usr/local/lib; sync" ;;
+bison:test)
+  run "cd /usr/src/bison-1988/test; bison getdate.y; bison posixtm.y"
+  run "cd /usr/src/bison-1988/test; ls -l"
+  run "cd /usr/src/bison-1988/test; gcc -O -c getdate.tab.c; gcc -O -c posixtm.tab.c; ls -l *.o" ;;
+fileutils:unpack) unpack fileutils-3.1 @FU_C@ ;;
+fileutils:build)  run "cd /usr/src/fileutils-3.1; make -f Makefile.l010" ;;
+fileutils:install)
+  # copy with the new cp: overwriting a running program breaks it (demand paging)
+  F=/usr/src/fileutils-3.1/src
+  for p in chgrp chmod chown cp dd du ginstall ln ls dir vdir mkdir mkfifo mknod mv mvdir rm rmdir touch; do
+    case $p in ginstall) n=install ;; *) n=$p ;; esac
+    if [ -f /bin/$n ]; then t=/bin/$n; else t=/usr/bin/$n; fi
+    run "$F/cp $F/$p $t; $F/chmod 755 $t"
+  done
+  run "sync" ;;
+make:unpack)  unpack make-3.62 @MAKE_C@ ;;
+make:build)
+  # glob's Makefile calls plain "ar"; build libglob.a by hand
+  run "cd /usr/src/make-3.62/glob; gcc -O -DPOSIX -DSTDC_HEADERS -Dstrcoll=strcmp -I. -c glob.c; gcc -O -DPOSIX -DSTDC_HEADERS -I. -c fnmatch.c"
+  run "cd /usr/src/make-3.62/glob; gar rc libglob.a glob.o fnmatch.o; /usr/local/lib/gcc-ranlib libglob.a"
+  run "cd /usr/src/make-3.62; make CC=gcc CFLAGS='-O -DPOSIX -DLINUX -DHAVE_DUP2' LOAD_AVG=-DNO_LDAV LDFLAGS=-s globdep= globlib=glob/libglob.a make" ;;
+make:install) run "cd /usr/src/make-3.62; cp /usr/bin/make /usr/bin/make.old; cp make /usr/bin/make; chmod 755 /usr/bin/make; sync" ;;
+sed:unpack)   unpack sed-1.13 @SED_C@ ;;
+sed:build)    run "cd /usr/src/sed-1.13; make CC=gcc CFLAGS=-O LDFLAGS=-s DEFS='-DSTDC_HEADERS=1 -DHAVE_VPRINTF=1' sed" ;;
+sed:install)  run "cd /usr/src/sed-1.13; cp sed /usr/bin/sed; chmod 755 /usr/bin/sed; sync" ;;
+tar:unpack)   unpack tar-1.11.1 @TAR_C@ ;;
+tar:build)    run "cd /usr/src/tar-1.11.1; make -f Makefile.l010 tar" ;;
+tar:install)  run "cd /usr/src/tar-1.11.1; cp /usr/bin/tar /usr/bin/tar.old; cp tar /usr/bin/tar; chmod 755 /usr/bin/tar; sync" ;;
+patch:unpack)  unpack patch-2.0.12u8 @PATCH_C@ ;;
+patch:build)   run "cd /usr/src/patch-2.0.12u8; make -f Makefile.l010" ;;
+patch:install) run "cd /usr/src/patch-2.0.12u8; cp patch /usr/bin/patch; chmod 755 /usr/bin/patch; sync" ;;
+more:unpack)  unpack more @MORE_C@ ;;
+more:build)   run "cd /usr/src/more; make CC=gcc CFLAGS=-O LIBC= more" ;;
+more:install)
+  [ -d /usr/lib ] || run "mkdir /usr/lib"
+  [ -f /etc/termcap ] || run "cp /usr/src/more/termcap /etc/termcap"
+  run "cd /usr/src/more; cp more /usr/bin/more; chmod 755 /usr/bin/more; cp more.help /usr/lib/more.help; sync" ;;
+*) usage ;;
+esac
+exit 0
