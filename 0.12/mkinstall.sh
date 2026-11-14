@@ -59,6 +59,18 @@ sys.stdout.buffer.write(data(*reversed(inode(ino))))
 PYEOF
 }
 
+aoutstrip() {
+    python3 -I - "$@" <<'PYEOF'
+import sys, struct
+for f in sys.argv[1:]:
+    d = bytearray(open(f, 'rb').read())
+    m, t, dd, bss, s, e, tr, dr = struct.unpack('<8I', d[:32])
+    if m & 0xffff != 0o413 or tr or dr or not s: continue
+    struct.pack_into('<I', d, 16, 0)
+    open(f, 'wb').write(d[:1024 + t + dd])
+PYEOF
+}
+
 R11=$SRC/images/rootimage-0.11-20040305
 for p in bin/mkfs bin/mount bin/umount bin/mknod usr/bin/tar usr/bin/compress; do
     minixcat "$R11" "/$p" > "$W/bin/$(basename $p)"
@@ -78,6 +90,7 @@ chmod 755 "$W/all/bin/"*
 for f in make egrep kermit em dir vdir expand unexpand split tac as86 ld86; do
     cp -p "$W/x/usr/bin/$f" "$W/all/usr/bin/"
 done
+aoutstrip "$W/all/usr/bin/"*
 mv "$W/x/gccbin/gcc" "$W/all/usr/local/bin/"
 mv "$W/x/gccbin/"* "$W/all/usr/local/lib/"
 cp -rp "$W/x/include-0.12/." "$W/all/usr/include/"

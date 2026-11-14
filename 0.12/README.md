@@ -25,7 +25,7 @@
 
 两张盘都是 **raw** 盘（没有文件系统）。0.12 原版 root 盘上没有 mount、tar、mkfs，guest 里只能用 `dd skip=… count=…` 按 1K 块偏移取文件。盘的开头是 guest 脚本，脚本里已经写好了各段的偏移。
 
-`install.flp`（约 1422/1440 块）：
+`install.flp`（约 1376/1440 块）：
 
 - `compress`：原样存放，后面所有 `.Z` 都靠它解压
 - `fdisk`、`mkfs`、`mount`、`tar`：各自压缩成 `.Z`
@@ -120,7 +120,7 @@ Host requirements: bash, python3, gzip, tar, `compress` (ncompress).
 
 Both floppies are **raw** (no filesystem). The stock 0.12 root diskette has no mount, tar or mkfs, so files are pulled out in the guest with `dd skip=… count=…` at 1K-block offsets. Each floppy starts with the guest script, which already contains those offsets.
 
-`install.flp` (about 1422/1440 blocks):
+`install.flp` (about 1376/1440 blocks):
 
 - `compress`, stored plain; every `.Z` below is unpacked with it
 - `fdisk`, `mkfs`, `mount`, `tar`, each compressed to `.Z`
