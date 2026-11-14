@@ -86,6 +86,13 @@ gzip -dc "$B12/compilers/gccbin.tar.Z" | tar xf - -C "$W/x"
 gzip -dc "$SRC/libs/libc/libc-0.1x/include-0.11.tar.Z" | tar xf - -C "$W/x"
 chmod -R u+rwX "$W/x"
 cp "$W/bin/umount" "$W/bin/mknod" "$W/all/bin/"
+# sync like V6 s2/sync.s: mov $36,%eax; int $0x80; xor %ebx,%ebx; mov $1,%eax; int $0x80
+python3 -I -c '
+import struct, sys
+code = bytes.fromhex("b824000000cd8031dbb801000000cd80")
+hdr = struct.pack("<8I", 0x010b, 4096, 0, 0, 0, 0, 0, 0)
+open(sys.argv[1], "wb").write(hdr.ljust(1024, b"\0") + code.ljust(4096, b"\0"))
+' "$W/all/bin/sync"
 chmod 755 "$W/all/bin/"*
 for f in make egrep kermit em dir vdir expand unexpand split tac as86 ld86; do
     cp -p "$W/x/usr/bin/$f" "$W/all/usr/bin/"
