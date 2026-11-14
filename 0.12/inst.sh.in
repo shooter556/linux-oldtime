@@ -2,15 +2,17 @@
 #   dd if=/dev/fd1 of=/tmp/inst bs=1024 count=@SCRIPT_N@
 FD=/dev/fd1
 HD=/dev/hd0
-PART=/dev/hd1
+SWAP=/dev/hd1
+PART=/dev/hd2
+SWAP_CYL=16
 
 usage() {
   echo "usage: sh /tmp/inst part    -n|--dry-run|-a|--apply HEADS SECTORS CYLINDERS"
   echo "       sh /tmp/inst install -n|--dry-run|-a|--apply"
   echo "       sh /tmp/inst rootdev -n|--dry-run|-a|--apply"
-  echo "  part     partition $HD as one Minix partition, then reboot"
-  echo "  install  mkfs $PART, copy root floppy + packages onto it"
-  echo "  rootdev  set ROOT_DEV=0x0301 on the boot floppy put into drive B"
+  echo "  part     partition $HD: $SWAP swap ($SWAP_CYL cylinders), $PART Minix, then reboot"
+  echo "  install  mkswap $SWAP, mkfs $PART, copy root floppy + packages onto it"
+  echo "  rootdev  set SWAP_DEV=0x0301, ROOT_DEV=0x0302 on the boot floppy in drive B"
   echo "  -n, --dry-run  print commands only;  -a, --apply  really run"
   exit 1
 }
@@ -29,7 +31,12 @@ getz() {
 }
 
 table() {
-  (echo p; echo q; echo q; echo q) | /tmp/fdisk $HD 2>&1 | grep "^${HD}1 "
+  (echo p; echo q; echo q; echo q) | /tmp/fdisk $HD 2>&1 | grep "^${HD}[12] "
+}
+
+blocks() {
+  set -- `table | grep "^${HD}$1 "`
+  echo $5
 }
 
 [ $# -ge 2 ] || usage
@@ -45,6 +52,8 @@ part)
   [ $# = 5 ] || usage
   H=$3; S=$4; C=$5
   let LAST=H*S*C-1
+  let SEND=H*S*SWAP_CYL-1
+  let RSTART=SEND+1
   run "rm -f /tmp/fdisk /tmp/mkfs /tmp/mount /tmp/umount /tmp/compress"
   get /tmp/compress @COMPRESS_O@ @COMPRESS_N@
   run "chmod 755 /tmp/compress"
@@ -52,9 +61,9 @@ part)
   getz /tmp/fdisk @FDISK_O@ @FDISK_N@
   run "chmod 755 /tmp/fdisk"
   if [ $DRY = 0 ] && [ -n "`table`" ]; then
-    echo "${HD}1 already exists:"; table; echo "delete it with /tmp/fdisk first"; exit 1
+    echo "partitions already exist:"; table; echo "delete them with /tmp/fdisk first"; exit 1
   fi
-  run "(echo x; echo h; echo $H; echo s; echo $S; echo c; echo $C; echo r; echo n; echo p; echo 1; echo $S; echo $LAST; echo w; echo q; echo q; echo q) | /tmp/fdisk $HD"
+  run "(echo x; echo h; echo $H; echo s; echo $S; echo c; echo $C; echo r; echo n; echo p; echo 1; echo $S; echo $SEND; echo n; echo p; echo 2; echo $RSTART; echo $LAST; echo t; echo 1; echo 82; echo w; echo q; echo q; echo q) | /tmp/fdisk $HD"
   if [ $DRY = 0 ]; then
     echo "partition table now:"; table
   fi
@@ -65,16 +74,18 @@ install)
   ZCAT="/tmp/compress -d"
   [ -x /tmp/compress ] || { echo "/tmp/compress missing: run part first"; exit 1; }
   if [ $DRY = 0 ]; then
-    set -- `table`
-    BLOCKS=$5
-    [ -n "$BLOCKS" ] || { echo "no ${HD}1 in partition table"; exit 1; }
+    SBLOCKS=`blocks 1`
+    BLOCKS=`blocks 2`
+    [ -n "$SBLOCKS" ] && [ -n "$BLOCKS" ] || { echo "need ${HD}1 and ${HD}2 in partition table"; exit 1; }
   else
-    BLOCKS='<blocks of hd01>'
+    SBLOCKS='<blocks of hd01>'
+    BLOCKS='<blocks of hd02>'
   fi
   run "rm -f /tmp/fdisk"
   getz /tmp/mkfs @MKFS_O@ @MKFS_N@
   getz /tmp/mount @MOUNT_O@ @MOUNT_N@
   run "chmod 755 /tmp/mkfs /tmp/mount"
+  run "/bin/mkswap $SWAP $SBLOCKS"
   run "/tmp/mkfs $PART $BLOCKS"
   [ -d /mnt ] || run "mkdir /mnt"
   run "/tmp/mount $PART /mnt"
@@ -100,7 +111,7 @@ rootdev)
     echo -n "boot floppy in drive B? [y/N] "; read a
     [ "$a" = y ] || exit 1
   fi
-  run "echo -n -e '\001\003' | dd of=$FD bs=1 seek=508 count=2"
+  run "echo -n -e '\001\003\002\003' | dd of=$FD bs=1 seek=506 count=4"
   echo "done. wait 30s (/etc/update syncs), power off, A=boot.flp, B empty, boot."
   ;;
 *) usage ;;

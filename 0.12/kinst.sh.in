@@ -5,8 +5,8 @@ SRC=/usr/src/linux-0.12
 
 usage() {
   echo "usage: sh /tmp/kinst -n|--dry-run|-a|--apply"
-  echo "  link gas/gld/gar/cpp to gcc-*, unpack $SRC (ROOT_DEV=/dev/hd1,"
-  echo "  SWAP_DEV=NONE), build /bin/sync from /usr/src/sync.c as a gcc test"
+  echo "  link gas/gld/gar/cpp to gcc-*, unpack $SRC (ROOT_DEV=/dev/hd2,"
+  echo "  SWAP_DEV=/dev/hd1), build /bin/sync from /usr/src/sync.c as a gcc test"
   echo "  -n, --dry-run  print commands only;  -a, --apply  really run"
   exit 1
 }

@@ -8,8 +8,8 @@ usage() {
     echo "Usage: $(basename "$0") -s|--source DIR -o|--output FLOPPY_IMAGE [-f|--force]"
     echo
     echo "Build a 1.44M raw floppy with the guest script /tmp/kinst (from kinst.sh.in)"
-    echo "and a compressed tar of usr/src/linux-0.12 (Makefile: ROOT_DEV=/dev/hd1,"
-    echo "SWAP_DEV=NONE, keyboard.S: KBD_US) plus usr/src/sync.c. Sources: an oldlinux-files tree."
+    echo "and a compressed tar of usr/src/linux-0.12 (Makefile: ROOT_DEV=/dev/hd2,"
+    echo "SWAP_DEV=/dev/hd1, keyboard.S: KBD_US) plus usr/src/sync.c. Sources: an oldlinux-files tree."
     echo
     echo "  -s, --source DIR   oldlinux-files tree (default: \$OLDLINUX)"
     echo "                     https://github.com/oldlinux-web/oldlinux-files"
@@ -39,8 +39,8 @@ trap 'rm -rf "$W"' EXIT
 mkdir -p "$W/usr/src"
 tar xf "$SRC/kernel/0.1x/linux-0.12.tar" -C "$W/usr/src"
 MK=$W/usr/src/linux-0.12/Makefile
-sed -i -e 's|^ROOT_DEV=/dev/hd6$|ROOT_DEV=/dev/hd1|' -e 's|^SWAP_DEV=/dev/hd2$|SWAP_DEV=NONE|' "$MK"
-grep -q '^ROOT_DEV=/dev/hd1$' "$MK" && grep -q '^SWAP_DEV=NONE$' "$MK" || { echo "[ERROR] Makefile patch failed" >&2; exit 1; }
+sed -i -e 's|^ROOT_DEV=/dev/hd6$|ROOT_DEV=/dev/hd2|' -e 's|^SWAP_DEV=/dev/hd2$|SWAP_DEV=/dev/hd1|' "$MK"
+grep -q '^ROOT_DEV=/dev/hd2$' "$MK" && grep -q '^SWAP_DEV=/dev/hd1$' "$MK" || { echo "[ERROR] Makefile patch failed" >&2; exit 1; }
 CF=$W/usr/src/linux-0.12/kernel/chr_drv/keyboard.S
 sed -i 's|^#define KBD_FINNISH$|#define KBD_US|' "$CF"
 grep -q '^#define KBD_US$' "$CF" || { echo "[ERROR] keyboard.S patch failed" >&2; exit 1; }
