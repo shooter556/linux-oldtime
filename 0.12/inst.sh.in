@@ -30,13 +30,18 @@ getz() {
   run "dd if=$FD bs=1024 skip=$2 count=$3 | $ZCAT > $1"
 }
 
-table() {
-  (echo p; echo q; echo q; echo q) | /tmp/fdisk $HD 2>&1 | grep "^${HD}[12] "
+tools() {
+  run "rm -f /tmp/fdisk /tmp/mkfs /tmp/mount /tmp/umount /tmp/compress"
+  get /tmp/compress @COMPRESS_O@ @COMPRESS_N@
+  run "chmod 755 /tmp/compress"
+  ZCAT="/tmp/compress -d"
+  getz /tmp/fdisk @FDISK_O@ @FDISK_N@
+  run "chmod 755 /tmp/fdisk"
 }
 
-blocks() {
-  set -- `table | grep "^${HD}$1 "`
-  echo $5
+table() {
+  (echo p; echo q) | /tmp/fdisk $HD > /tmp/ptab 2>&1
+  grep "^${HD}" /tmp/ptab
 }
 
 [ $# -ge 2 ] || usage
@@ -54,16 +59,11 @@ part)
   let LAST=H*S*C-1
   let SEND=H*S*SWAP_CYL-1
   let RSTART=SEND+1
-  run "rm -f /tmp/fdisk /tmp/mkfs /tmp/mount /tmp/umount /tmp/compress"
-  get /tmp/compress @COMPRESS_O@ @COMPRESS_N@
-  run "chmod 755 /tmp/compress"
-  ZCAT="/tmp/compress -d"
-  getz /tmp/fdisk @FDISK_O@ @FDISK_N@
-  run "chmod 755 /tmp/fdisk"
+  tools
   if [ $DRY = 0 ] && [ -n "`table`" ]; then
     echo "partitions already exist:"; table; echo "delete them with /tmp/fdisk first"; exit 1
   fi
-  run "(echo x; echo h; echo $H; echo s; echo $S; echo c; echo $C; echo r; echo n; echo p; echo 1; echo $S; echo $SEND; echo n; echo p; echo 2; echo $RSTART; echo $LAST; echo t; echo 1; echo 82; echo w; echo q; echo q; echo q) | /tmp/fdisk $HD"
+  run "(echo x; echo h; echo $H; echo s; echo $S; echo c; echo $C; echo r; echo n; echo p; echo 1; echo $S; echo $SEND; echo n; echo p; echo 2; echo $RSTART; echo $LAST; echo t; echo 1; echo 82; echo w) | /tmp/fdisk $HD"
   if [ $DRY = 0 ]; then
     echo "partition table now:"; table
   fi
@@ -71,15 +71,19 @@ part)
   echo "  sh /tmp/inst install --apply"
   ;;
 install)
-  ZCAT="/tmp/compress -d"
-  [ -x /tmp/compress ] || { echo "/tmp/compress missing: run part first"; exit 1; }
+  tools
   if [ $DRY = 0 ]; then
-    SBLOCKS=`blocks 1`
-    BLOCKS=`blocks 2`
-    [ -n "$SBLOCKS" ] && [ -n "$BLOCKS" ] || { echo "need ${HD}1 and ${HD}2 in partition table"; exit 1; }
+    table > /dev/null
+    set -- `grep "^${HD}1 " /tmp/ptab`
+    SBLOCKS=$5
+    set -- `grep "^${HD}2 " /tmp/ptab`
+    BLOCKS=$5
+    if [ -z "$SBLOCKS" ] || [ -z "$BLOCKS" ]; then
+      echo "need $SWAP and $PART in partition table; fdisk said:"; cat /tmp/ptab; exit 1
+    fi
   else
-    SBLOCKS='<blocks of hd01>'
-    BLOCKS='<blocks of hd02>'
+    SBLOCKS="<blocks of $SWAP>"
+    BLOCKS="<blocks of $PART>"
   fi
   run "rm -f /tmp/fdisk"
   getz /tmp/mkfs @MKFS_O@ @MKFS_N@
