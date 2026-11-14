@@ -1,0 +1,56 @@
+# Linux 0.10 development bootstrap (old bash). Read from dev.flp in drive B:
+#   dd if=/dev/fd1 of=/tmp/dinst bs=1024 count=@SCRIPT_N@
+# No pipelines: buffer.c 1.1 can lose updates when two processes do disk I/O.
+FD=/dev/fd1
+
+usage() {
+  echo "usage: sh /tmp/dinst install|test -n|--dry-run|-a|--apply"
+  echo "  install  B=dev.flp: compress, tar, gcc, /usr/include, make, pmake,"
+  echo "           as86, ld86; gas/gld/gar/cpp copies in /usr/local/bin"
+  echo "  test     compile and run hello.c"
+  echo "  -n, --dry-run  print commands only;  -a, --apply  really run"
+  exit 1
+}
+
+run() {
+  echo "+ $*"
+  if [ $DRY = 0 ]; then /bin/sh -c "$*" || { echo "FAILED: $*"; exit 1; }; fi
+}
+
+[ $# = 2 ] || usage
+case "$2" in
+  -n|--dry-run) DRY=1 ;;
+  -a|--apply) DRY=0 ;;
+  *) usage ;;
+esac
+
+case "$1" in
+install)
+  [ $DRY = 1 ] || [ ! -f /usr/local/bin/gcc ] || { echo "/usr/local/bin/gcc already exists"; exit 1; }
+  run "dd if=$FD of=/usr/bin/compress bs=1024 skip=@COMPRESS_O@ count=@COMPRESS_N@"
+  run "chmod 755 /usr/bin/compress"
+  run "dd if=$FD of=/tmp/tar.Z bs=1024 skip=@TAR_O@ count=@TAR_N@"
+  run "compress -d < /tmp/tar.Z > /usr/bin/tar"
+  run "chmod 755 /usr/bin/tar; rm /tmp/tar.Z; sync"
+  run "dd if=$FD of=/tmp/pkg.tar.Z bs=1024 skip=@PKG_O@ count=@PKG_N@"
+  run "sync"
+  run "compress -d < /tmp/pkg.tar.Z > /tmp/pkg.tar"
+  run "rm /tmp/pkg.tar.Z; sync"
+  run "cd /; tar xvf /tmp/pkg.tar"
+  run "rm /tmp/pkg.tar; sync"
+  for p in as ld ar cpp; do
+    case $p in cpp) n=cpp ;; *) n=g$p ;; esac
+    run "cp /usr/local/lib/gcc-$p /usr/local/bin/$n; chmod 755 /usr/local/bin/$n"
+  done
+  run "sync"
+  echo "next: sh /tmp/dinst test --apply"
+  ;;
+test)
+  run "echo 'main() { puts(\"hello from gcc on linux 0.10\"); return 0; }' > /tmp/hello.c"
+  run "cat /tmp/hello.c"
+  run "cd /tmp; gcc -o hello hello.c"
+  run "/tmp/hello"
+  ;;
+*) usage ;;
+esac
+exit 0
