@@ -18,8 +18,9 @@
 | `inst.sh.in` | 安装盘里的 guest 脚本模板（bash 1.12） |
 | `mkkernel.sh` | 主机端：生成内核源码盘 `kernel.flp` |
 | `kinst.sh.in` | 源码盘里的 guest 脚本模板 |
+| `mkgcc20.sh` | 主机端：生成自举 gcc 2.0 用的 `gcctools.flp`、`gccsrc1.flp`、`gccsrc2.flp` |
 
-主机需要：bash、python3、gzip、tar、`compress`（ncompress 包）。
+主机需要：bash、python3、gzip、tar、`compress`（ncompress 包）；`mkgcc20.sh` 另外要 bzip2 和 gcc（在主机上跑 enquire）。
 
 ### 软盘格式
 
@@ -84,6 +85,49 @@ cd /usr/src/linux-0.12; make
 dd bs=8192 if=Image of=/dev/fd1         # B 换一张空白盘
 ```
 
+### 自举 gcc 2.0，再编译 0.95 内核
+
+在装好的 0.12 上用 gcc 1.40 三阶段自举官方 gcc-2.0（1992-02-22），再用它编译原版 0.95 内核，0.95 内核能正常启动。VM：i386SX + **387**、4MB 内存、hd1 上约 8MB swap。
+
+```
+./mkgcc20.sh -s /path/to/oldlinux-files -o gcc20/
+```
+
+- `gcctools.flp`：打过补丁的 gnulib（`__truncdfsf2` 改 13 个字节）、`/bin/true`（主机上拼的 a.out）、`df.c`、主机上用 gcc 2.0 的 enquire 生成的 `float.h.ieee`、测试程序 `ftest.c`/`hdr.c`；脚本把 as、ld、ar、ranlib、nm、size、strip、gar、cpp 软链接到 `/usr/local/bin`（cpp 指向 2.0 安装后的位置）。
+- `gccsrc1.flp`、`gccsrc2.flp`：只保留 C 的 gcc-2.0 源码，每张一个独立的 tar.Z。Makefile.in、`config/x-i386v`、`config/t-svr3`、`config/i386gas.h` 已预先改好，加了 `fp387.asm`，改过的文件保留 1992 年的原时间戳。
+
+guest 里，每张盘（顺序：gcctools、gccsrc1、gccsrc2）：
+
+```
+dd if=/dev/fd1 of=/tmp/g bs=1024 count=2
+sh /tmp/g --apply                       # 先用 --dry-run 看
+```
+
+然后：
+
+```
+cd /usr/src/gcc/gcc-2.0
+./configure --gas i386-gas-sysv
+make bootstrap                          # mv 报 cc1plus、collect2 等不存在是正常的
+for file in *.o; do cmp $file stage2/$file; done
+cmp cc1 stage2/cc1; cmp cpp stage2/cpp; cmp gcc stage2/gcc     # 无输出 = 通过
+cp /usr/local/bin/gcc /usr/local/bin/gcc140                    # 安装会覆盖 1.40 的驱动
+make CC="stage2/gcc -Bstage2/" CFLAGS=-O install-common install-libgcc install-headers
+cp /usr/src/gcc/tools/float.h.ieee /usr/local/lib/gcc/i386-gas-sysv/2.0/include/float.h
+```
+
+在 `/tmp` 编 `ftest.c`：`i=24`、`3->3`、`atof: 0`（libc 是软浮点，double 返回值放在 eax:edx，gcc 2.0 从 st(0) 取，所以是 0）；`hdr.c`：`hello 5 6 2147483647`、`FLT_DIG=6 DBL_DIG=15`。
+
+0.95 内核：源码用原版 0.95（`git archive` 后重新打成 v7 tar，compress 后 dd 到软盘），只改 `ROOT_DEV=/dev/hd2` 和 `keyboard.S` 的 `KBD_US`，不要打开 `-fcombine-regs`。
+
+注意：
+
+- 必须打开 387。gcc 2.0 默认生成 387 代码，0.12 的 387 模拟不完整。
+- BIOS 日期必须晚于 1992-02-22（源码里最新文件的日期），否则 make 会反复重新生成 Makefile。
+- gcc 2.0 只提供驱动、cpp、cc1、libgcc.a 和头文件；as、ld、ar 等仍是 gccbin（1991）里的。
+- 0.95 内核里有大量 `conflicting types for built-in function` 警告（strlen、memcpy、memcmp）：gcc 2.0 的 `size_t` 是 `long unsigned int`，内核是 `unsigned int`，i386 上一样，可以忽略。
+- 0.95 不再读 boot 盘偏移 506 的 SWAP_DEV，要用 swapon。
+
 ### 遇到的坑
 
 - 开机的 SVGA 提示不要按回车，按空格。setup.s 会把模拟器的显卡误认成 Ahead 芯片，列出的模式都不能用。
@@ -115,8 +159,9 @@ Tested on 86Box (i386SX, 387, 8 MB RAM, IDE disk 128 cyl / 16 heads / 63 sectors
 | `inst.sh.in` | guest script template stored on the install floppy (bash 1.12) |
 | `mkkernel.sh` | host: builds the kernel source floppy `kernel.flp` |
 | `kinst.sh.in` | guest script template stored on the source floppy |
+| `mkgcc20.sh` | host: builds `gcctools.flp`, `gccsrc1.flp`, `gccsrc2.flp` for bootstrapping gcc 2.0 |
 
-Host requirements: bash, python3, gzip, tar, `compress` (ncompress).
+Host requirements: bash, python3, gzip, tar, `compress` (ncompress); `mkgcc20.sh` also needs bzip2 and gcc (to run enquire on the host).
 
 ### Floppy format
 
@@ -180,6 +225,49 @@ sh /tmp/kinst --apply                   # hard-link gas/gld/gar/cpp, unpack the 
 cd /usr/src/linux-0.12; make
 dd bs=8192 if=Image of=/dev/fd1         # with a blank floppy in B
 ```
+
+### Bootstrapping gcc 2.0, then building the 0.95 kernel
+
+On the installed 0.12, gcc 1.40 does a three-stage bootstrap of the official gcc-2.0 (1992-02-22); that gcc 2.0 then builds the stock 0.95 kernel, which boots. VM: i386SX + **387**, 4 MB RAM, about 8 MB of swap on hd1.
+
+```
+./mkgcc20.sh -s /path/to/oldlinux-files -o gcc20/
+```
+
+- `gcctools.flp`: patched gnulib (13 bytes in `__truncdfsf2`), `/bin/true` (an a.out built on the host), `df.c`, `float.h.ieee` produced on the host by gcc 2.0's enquire, test programs `ftest.c`/`hdr.c`. Its script symlinks as, ld, ar, ranlib, nm, size, strip, gar and cpp into `/usr/local/bin` (cpp points at where gcc 2.0 installs it).
+- `gccsrc1.flp`, `gccsrc2.flp`: the gcc-2.0 source trimmed to C, one independent tar.Z each. Makefile.in, `config/x-i386v`, `config/t-svr3` and `config/i386gas.h` are pre-patched, `fp387.asm` is added, and patched files keep their 1992 timestamps.
+
+In the guest, for each floppy (order: gcctools, gccsrc1, gccsrc2):
+
+```
+dd if=/dev/fd1 of=/tmp/g bs=1024 count=2
+sh /tmp/g --apply                       # try --dry-run first
+```
+
+Then:
+
+```
+cd /usr/src/gcc/gcc-2.0
+./configure --gas i386-gas-sysv
+make bootstrap                          # mv complaining about cc1plus, collect2 etc. is normal
+for file in *.o; do cmp $file stage2/$file; done
+cmp cc1 stage2/cc1; cmp cpp stage2/cpp; cmp gcc stage2/gcc     # no output = pass
+cp /usr/local/bin/gcc /usr/local/bin/gcc140                    # install overwrites the 1.40 driver
+make CC="stage2/gcc -Bstage2/" CFLAGS=-O install-common install-libgcc install-headers
+cp /usr/src/gcc/tools/float.h.ieee /usr/local/lib/gcc/i386-gas-sysv/2.0/include/float.h
+```
+
+Build `ftest.c` in `/tmp`: `i=24`, `3->3`, `atof: 0` (libc is soft-float and returns double in eax:edx, gcc 2.0 reads st(0)); `hdr.c`: `hello 5 6 2147483647`, `FLT_DIG=6 DBL_DIG=15`.
+
+0.95 kernel: the stock 0.95 source (`git archive`, repacked as a v7 tar, compressed and dd'd to a floppy), with only `ROOT_DEV=/dev/hd2` and `KBD_US` in `keyboard.S` changed. Do not enable `-fcombine-regs`.
+
+Notes:
+
+- The 387 must be enabled. gcc 2.0 emits 387 code by default and the 0.12 387 emulation is incomplete.
+- The BIOS date must be after 1992-02-22 (the newest file in the source), or make keeps regenerating the Makefile.
+- gcc 2.0 provides only the driver, cpp, cc1, libgcc.a and headers; as, ld, ar etc. are still the ones from gccbin (1991).
+- The 0.95 build prints many `conflicting types for built-in function` warnings (strlen, memcpy, memcmp): gcc 2.0's `size_t` is `long unsigned int`, the kernel's is `unsigned int`; identical on i386, harmless.
+- 0.95 no longer reads SWAP_DEV at offset 506 of the boot diskette; it needs swapon.
 
 ### Pitfalls
 
