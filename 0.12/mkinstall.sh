@@ -108,7 +108,7 @@ for f in fdisk mkfs mount tar; do compress -c "$W/bin/$f" > "$W/$f.Z"; done
 compress -c "$W/all.tar" > "$W/all.tar.Z"
 
 blocks() { echo $(( ($(stat -c%s "$1") + 1023) / 1024 )); }
-SCRIPT_N=4
+SCRIPT_N=5
 POS=$SCRIPT_N
 declare -A O N
 for f in compress:bin/compress fdisk:fdisk.Z mkfs:mkfs.Z mount:mount.Z tar:tar.Z pkg:all.tar.Z; do

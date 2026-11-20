@@ -65,8 +65,9 @@
 guest 里（A = boot → root 盘，B = install.flp）：
 
 ```
-dd if=/dev/fd1 of=/tmp/inst bs=1024 count=4
+dd if=/dev/fd1 of=/tmp/inst bs=1024 count=5
 sh /tmp/inst part --apply 16 63 128     # 磁头 扇区 柱面；fdisk 由管道驱动，建 hd1 swap（16 柱面）、hd2 root
+                                        # 已有分区会先全部删掉；已是目标布局则跳过，可重复执行
                                         # 等 30 秒，重启（0.12 只在开机时读分区表）
 sh /tmp/inst install --apply            # mkswap hd1、mkfs hd2、拷 root 盘、解软件包、umount
                                         # B 换成 boot 盘
@@ -206,8 +207,9 @@ You also need:
 In the guest (A = boot then root diskette, B = install.flp):
 
 ```
-dd if=/dev/fd1 of=/tmp/inst bs=1024 count=4
+dd if=/dev/fd1 of=/tmp/inst bs=1024 count=5
 sh /tmp/inst part --apply 16 63 128     # heads sectors cylinders; fdisk fed through a pipe, hd1 swap (16 cyl), hd2 root
+                                        # wipes any existing partitions; skips if already laid out, so it can be rerun
                                         # wait 30 s, reboot (0.12 reads the partition table only at boot)
 sh /tmp/inst install --apply            # mkswap hd1, mkfs hd2, copy the root diskette, unpack the package, umount
                                         # put the boot diskette into B
