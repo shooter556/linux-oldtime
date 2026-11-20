@@ -1,12 +1,12 @@
-# Linux 0.12 kernel source installer (bash 1.12). Read from kernel.flp in drive B:
+# Linux kernel source installer (bash 1.12). Read from kernel.flp in drive B:
 #   dd if=/dev/fd1 of=/tmp/kinst bs=1024 count=@SCRIPT_N@
 FD=/dev/fd1
-SRC=/usr/src/linux-0.12
+SRC=/usr/src/linux
 
 usage() {
   echo "usage: sh /tmp/kinst -n|--dry-run|-a|--apply"
-  echo "  link gas/gld/gar/cpp to gcc-*, unpack $SRC (ROOT_DEV=/dev/hd2,"
-  echo "  SWAP_DEV=/dev/hd1), build /bin/sync from /usr/src/sync.c as a gcc test"
+  echo "  link gas/gld/gar/cpp to gcc-*, unpack stock source into $SRC,"
+  echo "  build /bin/sync from /usr/src/sync.c as a gcc test"
   echo "  -n, --dry-run  print commands only;  -a, --apply  really run"
   exit 1
 }
@@ -33,6 +33,7 @@ run "dd if=$FD bs=1024 skip=@PKG_O@ count=@PKG_N@ | compress -d | (cd /; tar xvf
 run "gcc -o /bin/sync /usr/src/sync.c"
 run "/bin/sync"
 echo "next:"
+echo "  edit ROOT_DEV, SWAP_DEV, keyboard as mkkernel.sh printed (em or sed)"
 echo "  cd $SRC; make"
 echo "  put a blank floppy into drive B, then: dd bs=8192 if=Image of=$FD"
 exit 0

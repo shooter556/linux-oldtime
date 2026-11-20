@@ -6,7 +6,7 @@
 
 ## 中文
 
-用两张自制软盘，把 Linux 0.12（1992 年 1 月）从 boot + root 软盘装到硬盘上，并在装好的系统里用当年的 gcc 1.40 重新编译 0.12 内核。全部材料来自 [oldlinux-files](https://github.com/oldlinux-web/oldlinux-files)，主机只负责收集文件、做软盘，安装过程在虚拟机里完成。
+用两张自制软盘，把 Linux 0.12（1992 年 1 月）从 boot + root 软盘装到硬盘上，并在装好的系统里用当年的 gcc 1.40 重新编译 0.12 内核。材料来自 [oldlinux-files](https://github.com/oldlinux-web/oldlinux-files)（内核源码来自 Linux 历史 git 仓库），主机只负责收集文件、做软盘，安装过程在虚拟机里完成。
 
 在 86Box（i386SX、387、8MB 内存、IDE 硬盘 128 柱面 / 16 磁头 / 63 扇区）上验证通过。
 
@@ -36,11 +36,11 @@
   - gcc 1.40：`/usr/local/bin/gcc` 和 `/usr/local/lib/gcc-*`、crt0.o、libc.a、gnulib
   - `/usr/include`
 
-`kernel.flp`：`linux-0.12.tar` 原版源码，另外改了三处：
+`kernel.flp`：用 `git archive` 从 Linux 历史仓库（[history.git](https://git.kernel.org/pub/scm/linux/kernel/git/history/history.git)，tag 形如 `0.12`、`0.95`）导出指定 tag 的原版源码，不做任何修改，解到 `/usr/src/linux`：
 
-- `Makefile`：`ROOT_DEV=/dev/hd2`、`SWAP_DEV=/dev/hd1`
-- `kernel/chr_drv/keyboard.S`：`KBD_US`
 - 外加一个 `sync.c`，kinst 用它测试 gcc 能否正常工作
+- `mkkernel.sh` 会打印该 tag 里 `ROOT_DEV`、`SWAP_DEV`、键盘布局所在的文件、行号和原值，在虚拟机里用 `em` 或 `sed` 手动改成 `ROOT_DEV=/dev/hd2`、`SWAP_DEV=/dev/hd1`、US 键盘
+- 只用一张软盘，0.99.14 及以后的版本放不下，会报错
 
 各程序的来源：
 
@@ -54,7 +54,7 @@
 
 ```
 ./mkinstall.sh -s /path/to/oldlinux-files -o install.flp
-./mkkernel.sh  -s /path/to/oldlinux-files -o kernel.flp
+./mkkernel.sh  -s /path/to/history -t 0.12 -o kernel.flp
 ```
 
 还需要：
@@ -82,7 +82,7 @@ sh /tmp/inst rootdev --apply            # SWAP_DEV（偏移 506）写 0x0301、R
 ```
 dd if=/dev/fd1 of=/tmp/kinst bs=1024 count=2
 sh /tmp/kinst --apply                   # gas/gld/gar/cpp 硬链接、解源码、用 gcc 编 /bin/sync 测试 gcc
-cd /usr/src/linux-0.12; make
+cd /usr/src/linux; make
 dd bs=8192 if=Image of=/dev/fd1         # B 换一张空白盘
 ```
 
@@ -148,7 +148,7 @@ cp /usr/src/gcc/tools/float.h.ieee /usr/local/lib/gcc/i386-gas-sysv/2.0/include/
 
 ## English
 
-Two home-made floppies that install Linux 0.12 (January 1992) from the boot + root diskettes onto a hard disk, then rebuild the 0.12 kernel inside the installed system with the period gcc 1.40. Every file comes from [oldlinux-files](https://github.com/oldlinux-web/oldlinux-files). The host only collects files and writes floppy images; the installation itself runs inside the VM.
+Two home-made floppies that install Linux 0.12 (January 1992) from the boot + root diskettes onto a hard disk, then rebuild the 0.12 kernel inside the installed system with the period gcc 1.40. Files come from [oldlinux-files](https://github.com/oldlinux-web/oldlinux-files) (kernel source from the Linux history git repo). The host only collects files and writes floppy images; the installation itself runs inside the VM.
 
 Tested on 86Box (i386SX, 387, 8 MB RAM, IDE disk 128 cyl / 16 heads / 63 sectors).
 
@@ -178,11 +178,11 @@ Both floppies are **raw** (no filesystem). The stock 0.12 root diskette has no m
   - gcc 1.40: `/usr/local/bin/gcc` and `/usr/local/lib/gcc-*`, crt0.o, libc.a, gnulib
   - `/usr/include`
 
-`kernel.flp`: the stock `linux-0.12.tar` source, with three changes:
+`kernel.flp`: the stock source of one tag, exported unmodified with `git archive` from the Linux history repo ([history.git](https://git.kernel.org/pub/scm/linux/kernel/git/history/history.git), tags such as `0.12`, `0.95`) and unpacked to `/usr/src/linux`:
 
-- `Makefile`: `ROOT_DEV=/dev/hd2`, `SWAP_DEV=/dev/hd1`
-- `kernel/chr_drv/keyboard.S`: `KBD_US`
 - an added `sync.c`, which kinst compiles to check that gcc works
+- `mkkernel.sh` prints the file, line and stock value of `ROOT_DEV`, `SWAP_DEV` and the keyboard layout in that tag; change them by hand in the guest with `em` or `sed` to `ROOT_DEV=/dev/hd2`, `SWAP_DEV=/dev/hd1` and a US keyboard
+- one floppy only: 0.99.14 and later do not fit and are rejected
 
 Where the programs come from:
 
@@ -196,7 +196,7 @@ Where the programs come from:
 
 ```
 ./mkinstall.sh -s /path/to/oldlinux-files -o install.flp
-./mkkernel.sh  -s /path/to/oldlinux-files -o kernel.flp
+./mkkernel.sh  -s /path/to/history -t 0.12 -o kernel.flp
 ```
 
 You also need:
@@ -224,7 +224,7 @@ Rebuilding the kernel (booted from the hard disk, B = kernel.flp):
 ```
 dd if=/dev/fd1 of=/tmp/kinst bs=1024 count=2
 sh /tmp/kinst --apply                   # hard-link gas/gld/gar/cpp, unpack the source, build /bin/sync to test gcc
-cd /usr/src/linux-0.12; make
+cd /usr/src/linux; make
 dd bs=8192 if=Image of=/dev/fd1         # with a blank floppy in B
 ```
 
