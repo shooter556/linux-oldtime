@@ -116,8 +116,9 @@ install)
   if [ $DRY = 0 ]; then
     echo -n "put boot.flp into drive B, then press Enter "; read a
   fi
-  run "echo -n -e '\001\003\002\003' | dd of=$FD bs=1 seek=506 count=4"
-  run "dd if=$FD of=/mnt/Image bs=512 count=@IMAGE_S@"
+  run "dd if=$FD of=/mnt/Image0 bs=512 count=@IMAGE_S@"
+  run "(dd if=/mnt/Image0 bs=506 count=1; echo -n -e '\001\003\002\003'; dd if=/mnt/Image0 bs=510 skip=1) > /mnt/Image"
+  run "rm /mnt/Image0"
   run "cd /mnt/etc"
   run "./laceup $PART wini"
   run "./laceup -w $PN $HD"

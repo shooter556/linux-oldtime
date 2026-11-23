@@ -26,7 +26,7 @@
 
 两张盘都是 **raw** 盘（没有文件系统）。0.12 原版 root 盘上没有 mount、tar、mkfs，guest 里只能用 `dd skip=… count=…` 按 1K 块偏移取文件。盘的开头是 guest 脚本，脚本里已经写好了各段的偏移。
 
-`install.flp`（约 1421/1440 块）：
+`install.flp`（约 1430/1440 块）：
 
 - `compress`：原样存放，后面所有 `.Z` 都靠它解压
 - `fdisk`、`mkfs`、`mount`、`tar`：各自压缩成 `.Z`
@@ -71,8 +71,9 @@ sh /tmp/inst part --apply 128 16 63     # 柱面 磁头 扇区；fdisk 由管道
                                         # 已有分区会先全部删掉；已是目标布局则跳过，可重复执行
                                         # 等 30 秒，重启（0.12 只在开机时读分区表）
 sh /tmp/inst install --apply            # mkswap hd1、mkfs hd2、拷 root 盘、解软件包；中途提示时 B 换成 boot 盘
-                                        # 再写 boot 盘的 SWAP_DEV（偏移 506）0x0301、ROOT_DEV（偏移 508）0x0302，
-                                        # 拷成 hd2 的 /Image，laceup 装 ShoeLace 和 WiniBoot，umount
+                                        # 把 boot 盘的内核拷到 hd2，在拷贝里写 SWAP_DEV（偏移 506）0x0301、
+                                        # ROOT_DEV（偏移 508）0x0302，成为 /Image；boot 盘本身不改
+                                        # laceup 装 ShoeLace 和 WiniBoot，umount
                                         # 等 30 秒，关机，取出两张软盘，从硬盘启动
 ```
 
@@ -173,7 +174,7 @@ Host requirements: bash, python3, gzip, tar, `compress` (ncompress); `mkgcc20.sh
 
 Both floppies are **raw** (no filesystem). The stock 0.12 root diskette has no mount, tar or mkfs, so files are pulled out in the guest with `dd skip=… count=…` at 1K-block offsets. Each floppy starts with the guest script, which already contains those offsets.
 
-`install.flp` (about 1421/1440 blocks):
+`install.flp` (about 1430/1440 blocks):
 
 - `compress`, stored plain; every `.Z` below is unpacked with it
 - `fdisk`, `mkfs`, `mount`, `tar`, each compressed to `.Z`
@@ -218,8 +219,9 @@ sh /tmp/inst part --apply 128 16 63     # cylinders heads sectors; fdisk fed thr
                                         # wipes any existing partitions; skips if already laid out, so it can be rerun
                                         # wait 30 s, reboot (0.12 reads the partition table only at boot)
 sh /tmp/inst install --apply            # mkswap hd1, mkfs hd2, copy the root diskette, unpack the package; at the prompt put the boot diskette into B
-                                        # then write SWAP_DEV = 0x0301 at offset 506 and ROOT_DEV = 0x0302 at 508 on it,
-                                        # copy it to hd2 as /Image, laceup installs ShoeLace and WiniBoot, umount
+                                        # then copy its kernel to hd2 and write SWAP_DEV = 0x0301 at offset 506 and
+                                        # ROOT_DEV = 0x0302 at 508 in the copy, which becomes /Image; the boot diskette is left untouched
+                                        # laceup installs ShoeLace and WiniBoot, umount
                                         # wait 30 s, power off, remove both floppies, boot from the hard disk
 ```
 
