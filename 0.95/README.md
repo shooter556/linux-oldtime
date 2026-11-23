@@ -1,4 +1,4 @@
-# Linux 0.95 — build US-keyboard boot and root diskettes on 0.12
+# Linux 0.95 — build US-keyboard boot and root diskettes on 0.12, install to the hard disk
 
 [中文](#中文) | [English](#english)
 
@@ -6,9 +6,9 @@
 
 ## 中文
 
-oldlinux-files 里的 `bootimage-0.95` 是芬兰键盘，原版 `rootimage-0.95` 也没有留下来。这里在装好的 Linux 0.12（带 gcc 2.0，见 [../0.12](../0.12/)）里，从源码重新做一套 0.95 的 boot + root 软盘：内核用原版 0.95 源码，只改成美式键盘、从软盘取根；root 盘的内容以 `RELNOTES-0.95` 为基础，另外加了 vi、df、dd、tar、compress 和能建分区的 fdisk，程序尽量从源码编译。主机只负责收集源码、做一张软盘，编译和写盘都在虚拟机里完成。
+oldlinux-files 里的 `bootimage-0.95` 是芬兰键盘，原版 `rootimage-0.95` 也没有留下来。这里在装好的 Linux 0.12（带 gcc 2.0，见 [../0.12](../0.12/)）里，从源码重新做一套 0.95 的 boot + root 软盘：内核用原版 0.95 源码，只改成美式键盘、从软盘取根；root 盘的内容以 `RELNOTES-0.95` 为基础，另外加了 vi、df、dd、tar、compress 和能建分区的 fdisk，程序尽量从源码编译。主机只负责收集源码、做一张软盘，编译和写盘都在虚拟机里完成。之后用这套软盘把 0.95 装到硬盘，连同 gcc 2.0 编译环境，用 ShoeLace 从硬盘启动。
 
-在 86Box 上验证：0.12 虚拟机里编译、写盘通过；新开的 0.95 虚拟机用这两张盘启动到 `login:` 提示。
+在 86Box 上验证：0.12 虚拟机里编译、写盘通过；新开的 0.95 虚拟机用这两张盘启动到 `login:` 提示，装到硬盘后经 WiniBoot、ShoeLace 从硬盘启动。硬盘安装中途有几处是手工修正后再并入脚本的（见“遇到的坑”），并入后的脚本没有从头重跑一遍。
 
 ### 文件
 
@@ -17,17 +17,18 @@ oldlinux-files 里的 `bootimage-0.95` 是芬兰键盘，原版 `rootimage-0.95`
 | `mkbootroot.sh` | 主机端：生成源码盘 `br095.flp` |
 | `brinst.sh.in` | 源码盘里的 guest 脚本模板（bash 1.12） |
 | `tools.mk` | 在 guest 里成为 `/usr/src/0.95/Makefile`，编 root 盘上的程序 |
+| `inst.sh.in` | 0.95 硬盘安装脚本模板，由 `gccpkg` 写到 gcc.flp 开头 |
 
 主机需要：bash、python3、gzip、tar、`compress`（ncompress 包）。
 
 ### 源码盘
 
-`br095.flp` 是 raw 盘（没有文件系统）：开头 4 块是 guest 脚本，后面是一个 compress 过的 v7 tar 包（约 846 块），按最终路径摆好：
+`br095.flp` 是 raw 盘（没有文件系统）：开头 6 块是 guest 脚本，后面是一个 compress 过的 v7 tar 包（约 942 块），按最终路径摆好：
 
 - `/usr/src/linux`：原版 `linux-0.95.tar`，只改两处，都保留原时间戳：
   - `Makefile`：`ROOT_DEV=/dev/hdb1` 改成 `ROOT_DEV=FLOPPY`（原版 bootimage-0.95 偏移 508 也是 `00 00`）
   - `kernel/chr_drv/keyboard.S`：`KBD_FINNISH` 改成 `KBD_US`
-- `/usr/src/0.95`：root 盘程序的源码、`Makefile`（即 `tools.mk`），以及 `etc/` 下 root 盘用的 inittab、rc、passwd、group、issue、securetty
+- `/usr/src/0.95`：root 盘程序的源码、`Makefile`（即 `tools.mk`），以及 `etc/` 下 root 盘用的 inittab、rc、passwd、group、issue、securetty；硬盘安装用的 `inst.sh.in` 和 `shoe/`（`bin-src/shoelace.tar.Z` 里 1992-01-17 的 Linux 版 ShoeLace 二进制，加一个只有 `boot /Image` 的 config）
 
 root 盘上的程序和来源：
 
@@ -60,7 +61,7 @@ RELNOTES 原版 root 盘上没有 vi、df、dd、tar、compress，这里为了�
 guest 里（已装好的 0.12 + gcc 2.0，B = br095.flp）：
 
 ```
-dd if=/dev/fd1 of=/tmp/br bs=1024 count=4
+dd if=/dev/fd1 of=/tmp/br bs=1024 count=6
 sh /tmp/br unpack --apply     # 解到 /usr/src/linux 和 /usr/src/0.95（已存在则拒绝）
 sh /tmp/br build --apply      # make root 盘程序，再 make 0.95 内核
                               # B 换成 boot.flp
@@ -73,7 +74,46 @@ sh /tmp/br root --apply       # mkfs 1440、拷程序和 /etc、mknod /dev、umo
 
 启动：A 放 boot.flp，提示 `Insert root floppy and press ENTER` 时换成 root.flp。看到 ` Ok. ` 和 `login:`，用 `root` 登录，没有密码。新硬盘还没分区时会提示 `Bad partition table on dev 0300`，不影响启动。vi 如果显示不对，用 `TERM=con80x25 vi`。
 
-root 盘的 `/dev`（0.95 新编号）：`PS0 PS1 at0 at1`、`hda hda1–8`（3,0–8）、`hdb hdb1–8`（3,64–72）、`ram mem kmem null port`、`tty tty0 console tty1–8 ttys1–4`。
+root 盘的 `/dev`（0.95 新编号）：`PS0 PS1 at0 at1`、`hda hda1–8`（3,0–8）、`hdb hdb1–8`（3,64–72）、`ram mem kmem null port`、`tty tty0 console tty1–8 ttys1–4`。0.95 时的软驱名就是这样：PS0/PS1 是 1.44M 的 A:/B:，at0/at1 是 1.2M（INSTALL-0.95a）。
+
+### 装到硬盘
+
+硬盘按 0.95 虚拟机的设置：128 柱面、16 磁头、63 扇区。gcc 2.0 要 387，0.95 虚拟机要打开 FPU。
+
+一套东西压缩后约 1.7M，分两张盘：
+
+- `gcc.flp`：开头 8 块是安装脚本（`inst.sh.in` 填上块数），后面是一个 compress 过的 tar：0.12 硬盘上的 gcc 2.0（`/usr/local`）、gccbin 的 as/ld 等、libc-0.12（作 `/usr/local/lib/libc.a`）、`/usr/include`（换上 0.95 内核的 `string.h`）、`/usr/bin/make`，以及 ShoeLace 和偏移 508 改成 `02 03` 的 `/Image`
+- `tools.flp`：0.12 硬盘 `/usr/bin` 里 root 盘没有的工具：grep egrep sed head tail cmp cut paste du split tac expand unexpand basename file stty uniq mkfifo dir vdir em kermit as86 ld86 等
+
+0.12 里（B = br095.flp，源码已 unpack、build）：
+
+```
+dd if=/dev/fd1 of=/tmp/br bs=1024 count=6
+sh /tmp/br gccpkg --apply     # 提示时 B 换成空白的 gcc.flp，再换成 tools.flp
+```
+
+0.95 里（boot + root 软盘启动，B = gcc.flp）：
+
+```
+dd if=/dev/PS1 of=/tmp/inst bs=1024 count=8
+sh /tmp/inst part --apply 128 16 63   # 柱面 磁头 扇区；hda1 swap 16 柱面，hda2 其余；之后等 30 秒重启
+dd if=/dev/PS1 of=/tmp/inst bs=1024 count=8
+sh /tmp/inst install --apply          # 中途提示时 B 换成 tools.flp
+```
+
+`part` 用 fdisk 0.91 写分区表，已经是这样分的就跳过。`install` 做 mkswap、swapon、mkfs，把 root 盘的 `bin dev etc usr` 拷过去，解开两张盘，在 `/usr/local/bin` 建 as、ld、cpp 等的硬链接，写 `/etc/profile`（PATH 加 `/usr/local/bin`）、在 `/etc/rc` 开头加 `swapon /dev/hda1`，最后 `laceup /dev/hda2 wini`（bootlace 写进 hda2 的引导块）、`laceup -w 2 /dev/hda`（WiniBoot 写进 MBR，保留分区表，默认第 2 分区）。
+
+完成后等 30 秒、关机、取出软盘再开机：
+
+- WiniBoot 显示分区表和 `Boot:`，按 `1`–`4` 立刻启动对应分区（不用回车），约 15 秒不按就启动默认分区；按别的键会取消倒计时。
+- ShoeLace 读 `/etc/config`，载入 `/Image`。它会提示 `/dev/fd0 not found`（找内存盘设备的默认名，0.95 没有 fd0）和 `kernel : kernel not found`（先按 Minix 的部件方式找），都不影响启动。
+
+ShoeLace 的几点用法：
+
+- 换内核：新 Image 偏移 508 也要写成 `02 03`，这个版本的 ShoeLace 不设根设备（那段代码被注释掉了），用的是 Image 里的值：`(dd if=Image bs=508 count=1; echo -n -e '\002\003'; dd if=Image bs=510 skip=1) > /Image`
+- 改了 `/etc/config` 不用重装。`laceup -w N /dev/hda` 改默认分区；千万别对 `/dev/hda` 跑不带 `-w` 的 laceup，会覆盖分区表。
+- WiniBoot 的超时写死在代码里：MBR 偏移 132–133 是 tick 数（小端，原值 `0e 01` = 270，每秒 18.2），比如改成 5 秒：`echo -n -e '\133\000' | dd of=/dev/hda bs=1 seek=132 count=2`。重跑 `laceup -w` 会恢复原值。0 表示不超时。
+- ShoeLace 默认按 0.95 的 4 个 setup 扇区摆放 Image（它在 0x90C00 处把后面的数据挪到 0x10000），setup 大小不同的内核要注意。
 
 ### 遇到的坑
 
@@ -99,13 +139,22 @@ root 盘的 `/dev`（0.95 新编号）：`PS0 PS1 at0 at1`、`hda hda1–8`（3,
 - Minix 文件名最多 14 个字符，`mkbootroot.sh` 会检查。
 - 0.12 没有 rename 系统调用，mv 不能移动目录：要替换包里的某个目录，从源码盘单独解出来，再 `rm -rf` 旧的。
 
+硬盘安装时：
+
+- root 盘上没有 grep、sed，安装脚本只用 bash 自己的 `while read`、`case` 解析 fdisk 输出。
+- root 盘的 ln（fileutils 3.1 配 libc-0.12）不支持符号链接，自动改成硬链接，所以 `/usr/local/bin` 下的 as、ld、cpp 等都是在 `/mnt` 里建的硬链接。
+- 安装脚本超过 4K，`dd count=4` 读到的是截断的脚本，bash 报 `Unexpected EOF`。现在留 8 块，`gccpkg` 会检查大小。
+- fdisk 0.91 写出的第 1 分区起始 CHS 不对（显示磁头 f、扇区 4），起始扇区和大小是对的，Linux 和 WiniBoot（只启动第 2 分区）都不受影响。它对 hda2 提示 `Linux cannot currently use 47361 sectors`，是拿扇区数和 65535 比，实际 56448 块没超 64M 的限制。
+- 主机上用 ncompress 压的 ShoeLace 包，0.95 上的 compress（和 0.12 硬盘上的是同一个二进制）解到一半就退出，原因没查清；同样由主机压缩的源码包在 0.12 上解压没问题。现在 ShoeLace 放在 gcc.flp 里，由 0.12 上的 compress 压缩。
+- 0.11 的 compress 用 `-d` 解文件时总会在文件名后加 `.Z`（`shoe.tar.Z` 变成找 `shoe.tar.ZZ`），只用管道方式。
+
 ---
 
 ## English
 
-The `bootimage-0.95` in oldlinux-files has a Finnish keyboard, and the original `rootimage-0.95` did not survive. This rebuilds a 0.95 boot + root diskette pair from source inside an installed Linux 0.12 with gcc 2.0 (see [../0.12](../0.12/)). The kernel is the stock 0.95 source changed only to a US keyboard and a floppy root; the root diskette is based on `RELNOTES-0.95`, plus vi, df, dd, tar, compress and an fdisk that can create partitions, with programs built from source wherever possible. The host only collects sources and writes one floppy; compiling and writing the diskettes happen inside the VM.
+The `bootimage-0.95` in oldlinux-files has a Finnish keyboard, and the original `rootimage-0.95` did not survive. This rebuilds a 0.95 boot + root diskette pair from source inside an installed Linux 0.12 with gcc 2.0 (see [../0.12](../0.12/)). The kernel is the stock 0.95 source changed only to a US keyboard and a floppy root; the root diskette is based on `RELNOTES-0.95`, plus vi, df, dd, tar, compress and an fdisk that can create partitions, with programs built from source wherever possible. The host only collects sources and writes one floppy; compiling and writing the diskettes happen inside the VM. The diskettes then install 0.95 to the hard disk, with the gcc 2.0 development environment, booting from the hard disk with ShoeLace.
 
-Tested on 86Box: the build and both diskettes are made in the 0.12 VM, and a fresh 0.95 VM boots from them to the `login:` prompt.
+Tested on 86Box: the build and both diskettes are made in the 0.12 VM, a fresh 0.95 VM boots from them to the `login:` prompt, and after the install it boots from the hard disk via WiniBoot and ShoeLace. A few hard disk install steps were fixed by hand on the way and then folded into the scripts (see Pitfalls); the final scripts have not been rerun from scratch.
 
 ### Files
 
@@ -114,17 +163,18 @@ Tested on 86Box: the build and both diskettes are made in the 0.12 VM, and a fre
 | `mkbootroot.sh` | host: builds the source floppy `br095.flp` |
 | `brinst.sh.in` | guest script template stored on the source floppy (bash 1.12) |
 | `tools.mk` | becomes `/usr/src/0.95/Makefile` in the guest; builds the root diskette programs |
+| `inst.sh.in` | 0.95 hard disk installer template, written to the start of gcc.flp by `gccpkg` |
 
 Host needs: bash, python3, gzip, tar, `compress` (ncompress package).
 
 ### Source floppy
 
-`br095.flp` is a raw floppy (no filesystem): the guest script in the first 4 blocks, then a compressed v7 tar (about 846 blocks) laid out at final paths:
+`br095.flp` is a raw floppy (no filesystem): the guest script in the first 6 blocks, then a compressed v7 tar (about 942 blocks) laid out at final paths:
 
 - `/usr/src/linux`: stock `linux-0.95.tar` with two changes, both keeping their timestamps:
   - `Makefile`: `ROOT_DEV=/dev/hdb1` becomes `ROOT_DEV=FLOPPY` (the original bootimage-0.95 also has `00 00` at offset 508)
   - `kernel/chr_drv/keyboard.S`: `KBD_FINNISH` becomes `KBD_US`
-- `/usr/src/0.95`: sources of the root diskette programs, a `Makefile` (`tools.mk`), and in `etc/` the inittab, rc, passwd, group, issue and securetty for the root diskette
+- `/usr/src/0.95`: sources of the root diskette programs, a `Makefile` (`tools.mk`), and in `etc/` the inittab, rc, passwd, group, issue and securetty for the root diskette; for the hard disk install, `inst.sh.in` and `shoe/` (the 1992-01-17 Linux build of ShoeLace from `bin-src/shoelace.tar.Z`, plus a config holding only `boot /Image`)
 
 Root diskette programs and their sources:
 
@@ -157,7 +207,7 @@ Also prepare two blank 1.44M images: `boot.flp` and `root.flp`.
 In the guest (installed 0.12 + gcc 2.0, B = br095.flp):
 
 ```
-dd if=/dev/fd1 of=/tmp/br bs=1024 count=4
+dd if=/dev/fd1 of=/tmp/br bs=1024 count=6
 sh /tmp/br unpack --apply     # unpack into /usr/src/linux and /usr/src/0.95 (refuses if they exist)
 sh /tmp/br build --apply      # make the root diskette programs, then the 0.95 kernel
                               # B = boot.flp
@@ -170,7 +220,46 @@ Every subcommand takes `--dry-run` to print the commands only. If `/usr/src/linu
 
 Booting: boot.flp in A; at `Insert root floppy and press ENTER` swap in root.flp. You get ` Ok. ` and `login:`; log in as `root` with no password. A blank, unpartitioned hard disk gives `Bad partition table on dev 0300`, which does not stop the boot. If vi looks wrong, run `TERM=con80x25 vi`.
 
-Root diskette `/dev` (0.95 numbering): `PS0 PS1 at0 at1`, `hda hda1–8` (3,0–8), `hdb hdb1–8` (3,64–72), `ram mem kmem null port`, `tty tty0 console tty1–8 ttys1–4`.
+Root diskette `/dev` (0.95 numbering): `PS0 PS1 at0 at1`, `hda hda1–8` (3,0–8), `hdb hdb1–8` (3,64–72), `ram mem kmem null port`, `tty tty0 console tty1–8 ttys1–4`. These are the floppy names of the 0.95 days: PS0/PS1 are 1.44M A:/B:, at0/at1 are 1.2M (INSTALL-0.95a).
+
+### Installing to the hard disk
+
+The disk follows the 0.95 VM: 128 cylinders, 16 heads, 63 sectors. gcc 2.0 needs a 387, so enable the FPU in the 0.95 VM.
+
+Compressed, everything is about 1.7M, so it takes two floppies:
+
+- `gcc.flp`: the installer in the first 8 blocks (`inst.sh.in` with the block counts filled in), then a compressed tar: gcc 2.0 from the 0.12 hard disk (`/usr/local`), gccbin's as/ld and friends, libc-0.12 (as `/usr/local/lib/libc.a`), `/usr/include` (with the 0.95 kernel's `string.h`), `/usr/bin/make`, plus ShoeLace and `/Image` with `02 03` at offset 508
+- `tools.flp`: tools from the 0.12 `/usr/bin` that the root diskette lacks: grep egrep sed head tail cmp cut paste du split tac expand unexpand basename file stty uniq mkfifo dir vdir em kermit as86 ld86 and so on
+
+On 0.12 (B = br095.flp, sources unpacked and built):
+
+```
+dd if=/dev/fd1 of=/tmp/br bs=1024 count=6
+sh /tmp/br gccpkg --apply     # when asked, B = blank gcc.flp, then tools.flp
+```
+
+On 0.95 (booted from the boot + root diskettes, B = gcc.flp):
+
+```
+dd if=/dev/PS1 of=/tmp/inst bs=1024 count=8
+sh /tmp/inst part --apply 128 16 63   # cylinders heads sectors; hda1 swap 16 cyl, hda2 the rest; wait 30s, reboot
+dd if=/dev/PS1 of=/tmp/inst bs=1024 count=8
+sh /tmp/inst install --apply          # B = tools.flp when asked
+```
+
+`part` writes the partition table with fdisk 0.91 and skips if it is already laid out that way. `install` runs mkswap, swapon and mkfs, copies `bin dev etc usr` of the root diskette, unpacks both floppies, makes hard links for as, ld, cpp and friends in `/usr/local/bin`, writes `/etc/profile` (PATH with `/usr/local/bin`), puts `swapon /dev/hda1` at the top of `/etc/rc`, and finally runs `laceup /dev/hda2 wini` (bootlace into hda2's boot block) and `laceup -w 2 /dev/hda` (WiniBoot into the MBR, keeping the partition table, default partition 2).
+
+Then wait 30 seconds, power off, remove the floppies and boot:
+
+- WiniBoot shows the partition table and `Boot:`. `1`–`4` boots that partition at once (no Enter); after about 15 seconds it boots the default partition; any other key cancels the countdown.
+- ShoeLace reads `/etc/config` and loads `/Image`. It says `/dev/fd0 not found` (the default RAM image device name; 0.95 has no fd0) and `kernel : kernel not found` (it first tries Minix components); neither stops the boot.
+
+Using ShoeLace:
+
+- New kernel: put `02 03` at offset 508 of the new Image as well. This ShoeLace build does not set the root device (that code is commented out) and uses the Image's own value: `(dd if=Image bs=508 count=1; echo -n -e '\002\003'; dd if=Image bs=510 skip=1) > /Image`
+- Changing `/etc/config` needs no reinstall. `laceup -w N /dev/hda` changes the default partition; never run laceup on `/dev/hda` without `-w`, it overwrites the partition table.
+- The WiniBoot timeout is hard-coded: MBR offset 132–133 holds the tick count (little endian, originally `0e 01` = 270, 18.2 per second). For 5 seconds: `echo -n -e '\133\000' | dd of=/dev/hda bs=1 seek=132 count=2`. Rerunning `laceup -w` restores it. 0 means no timeout.
+- ShoeLace lays the Image out for 0.95's 4 setup sectors (at 0x90C00 it moves the rest to 0x10000); mind this with kernels of a different setup size.
 
 ### Pitfalls
 
@@ -195,3 +284,12 @@ The build environment on the 0.12 hard disk was not what it looked like; all of 
 - Unpack with `cd /`: package paths start with `usr/src`.
 - Minix file names are at most 14 characters; `mkbootroot.sh` checks this.
 - 0.12 has no rename syscall, so mv cannot move directories: to replace a directory from the package, extract it alone from the source floppy, then `rm -rf` the old one.
+
+During the hard disk install:
+
+- The root diskette has no grep or sed; the installer parses fdisk output with bash's own `while read` and `case`.
+- The root diskette's ln (fileutils 3.1 with libc-0.12) has no symlink support and falls back to hard links, so as, ld, cpp and friends in `/usr/local/bin` are hard links made inside `/mnt`.
+- The installer grew past 4K; `dd count=4` read a truncated script and bash said `Unexpected EOF`. It now gets 8 blocks and `gccpkg` checks the size.
+- fdisk 0.91 wrote a wrong start CHS for partition 1 (head f, sector 4); its start sector and size are right, so neither Linux nor WiniBoot (which boots partition 2) cares. Its `Linux cannot currently use 47361 sectors` for hda2 compares sectors with 65535; the 56448 blocks are within the 64M limit.
+- A ShoeLace package compressed by ncompress on the host made the 0.95 compress (the same binary as on the 0.12 hard disk) stop halfway; the cause is unknown, while the host-compressed source package unpacks fine on 0.12. ShoeLace now goes on gcc.flp, compressed by compress on 0.12.
+- The 0.11 compress always appends `.Z` to file names with `-d` (`shoe.tar.Z` makes it look for `shoe.tar.ZZ`); use it in pipes only.
