@@ -126,7 +126,7 @@ ShoeLace 的几点用法：
 - 同样的问题出在 `unistd.h` 的 `_syscall1`（`"b"` 输入）。`lib_swapon.c` 按 0.95 内核 `unistd.h` 的写法展开（`movl` 到 ebx、`"g"` 输入、声明 bx 被改）。include-0.12 也没有 `__NR_swapon`，补 `87`。
 - gcc 2.0 的 cc1 用 `-O` 编 poeigl 的 `login.c` 会崩（signal 11，0.12 内核打印 `nonexistent page error in do_no_page`），去掉 `-O` 就能过，所以 `login.c` 单独不优化。
 - gcc 2.0 驱动的链接 spec 里没有 `%{s}`，`-s` 只报 `unrecognized option` 警告，不会 strip。用 `-Xlinker -s`。
-- `conflicting types for built-in function`（strlen、memcpy、memcmp）警告可以忽略，原因同 0.12 里编 0.95 内核。
+- `conflicting types for built-in function`（strlen、memcpy、memcmp）警告可以忽略，原因同 0.12 里编 0.95 内核（用新版 `mkgcc20.sh` 做的盘自举 gcc 2.0 就没有这些警告，见 [../0.12](../0.12/)）。
 - 源码目录不能和 make 目标同名：最初 swapon 源码放在 `swapon/`，make 把这个目录当成已有的目标，跳过了编译。现在叫 `swapsrc/`。
 - poeigl-1.2 要的头文件比 include-0.12 新：补 `memory.h`（只 include `string.h`）、0.95 内核的 `sys/param.h`（`MAXHOSTNAMELEN`）和 `sys/resource.h`；`login.c` 的 `MAXPATHLEN` 按 poe 自己 1992-03-02 的补丁定义成 `_POSIX_PATH_MAX`。crt0.o 定义了 `environ`。
 - 0.95 的 `sys_write` 会检查文件打开方式：mount、umount 的锁文件原来只用 `O_CREAT | O_EXCL` 打开，写不进 `/etc/mtab`，补上 `O_WRONLY`。
@@ -273,7 +273,7 @@ The build environment on the 0.12 hard disk was not what it looked like; all of 
 - The same problem hits `_syscall1` in `unistd.h` (a `"b"` input). `lib_swapon.c` expands it the way the 0.95 kernel `unistd.h` does (`movl` to ebx, `"g"` input, bx clobbered). include-0.12 also lacks `__NR_swapon`; it is defined as `87`.
 - gcc 2.0's cc1 crashes on poeigl's `login.c` at `-O` (signal 11; the 0.12 kernel prints `nonexistent page error in do_no_page`) and is fine without `-O`, so `login.c` alone is built unoptimized.
 - The gcc 2.0 driver's link spec has no `%{s}`: `-s` only gives an `unrecognized option` warning and nothing is stripped. Use `-Xlinker -s`.
-- `conflicting types for built-in function` warnings (strlen, memcpy, memcmp) are harmless, for the same reason as when building the 0.95 kernel on 0.12.
+- `conflicting types for built-in function` warnings (strlen, memcpy, memcmp) are harmless, for the same reason as when building the 0.95 kernel on 0.12 (a gcc 2.0 bootstrapped from floppies made by the current `mkgcc20.sh` does not print them, see [../0.12](../0.12/)).
 - A source directory must not share its name with a make target: the swapon sources first lived in `swapon/`, make took the directory for an existing target and skipped the build. It is now `swapsrc/`.
 - poeigl-1.2 wants newer headers than include-0.12: a `memory.h` (just includes `string.h`), the 0.95 kernel's `sys/param.h` (`MAXHOSTNAMELEN`) and `sys/resource.h`; `MAXPATHLEN` in `login.c` is `_POSIX_PATH_MAX`, as in poe's own patch of 1992-03-02. crt0.o defines `environ`.
 - 0.95's `sys_write` checks the open mode: mount and umount opened their lock file with only `O_CREAT | O_EXCL` and could not write `/etc/mtab`; `O_WRONLY` is added.

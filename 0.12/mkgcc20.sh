@@ -84,6 +84,10 @@ open('config/i386gas.h', 'a').write('''
 /* Linux 0.12: libc has atexit, so libgcc2 must not define exit() calling SysV _cleanup(). */
 #define HAVE_ATEXIT
 
+/* Linux headers say size_t is unsigned int; gcc 2's default long unsigned int
+   makes every strlen/memcpy/memcmp declaration "conflict with the built-in". */
+#define SIZE_TYPE "unsigned int"
+
 /* libc atof/ldexp are soft-float and return double in eax:edx; gcc 2 expects st(0). */
 #if __GNUC__ >= 2
 #define REAL_VALUE_ATOF(x) __atof387 (x)
