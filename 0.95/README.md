@@ -29,7 +29,7 @@ oldlinux-files 里的 `bootimage-0.95` 是芬兰键盘，原版 `rootimage-0.95`
 - `/usr/src/linux`：原版 `linux-0.95.tar`，只改两处，都保留原时间戳：
   - `Makefile`：`ROOT_DEV=/dev/hdb1` 改成 `ROOT_DEV=FLOPPY`（原版 bootimage-0.95 偏移 508 也是 `00 00`）
   - `kernel/chr_drv/keyboard.S`：`KBD_FINNISH` 改成 `KBD_US`
-- `/usr/src/0.95`：root 盘程序的源码、`Makefile`（即 `tools.mk`），以及 `etc/` 下 root 盘用的 inittab、rc、passwd、group、issue、securetty；硬盘安装用的 `inst.sh.in` 和 `shoe/`（`bin-src/shoelace.tar.Z` 里 1992-01-17 的 Linux 版 ShoeLace 二进制，加一个只有 `boot /Image` 的 config）；`gzip-1.1.1/`（仓库里的 `gzip-1.1.1`，加 `Makefile.l095`），build 时编好放进 tools.flp（1993 年的 gzip 二进制都要共享库，0.95 用不了）
+- `/usr/src/0.95`：root 盘程序的源码、`Makefile`（即 `tools.mk`），以及 `etc/` 下 root 盘用的 inittab、rc、passwd、group、issue、securetty；硬盘安装用的 `inst.sh.in` 和 `shoe/`（`bin-src/shoelace.tar.Z` 里 1992-01-17 的 Linux 版 ShoeLace 二进制，加一个只有 `boot /Image` 的 config）；`gzip-1.1.1/`（仓库里的 `gzip-1.1.1`：FreeBSD 1993-06-18 导入的 gzip，提交 222b83e890，标题写 1.1、实为 1.1.1，第一个默认 `.gz` 的版本；去掉了 BSD Makefile，加 `Makefile.l095`），build 时编好放进 tools.flp（1993 年的 gzip 二进制都要共享库，0.95 用不了）
 
 root 盘上的程序和来源：
 
@@ -176,7 +176,7 @@ Host needs: bash, python3, gzip, tar, `compress` (ncompress package).
 - `/usr/src/linux`: stock `linux-0.95.tar` with two changes, both keeping their timestamps:
   - `Makefile`: `ROOT_DEV=/dev/hdb1` becomes `ROOT_DEV=FLOPPY` (the original bootimage-0.95 also has `00 00` at offset 508)
   - `kernel/chr_drv/keyboard.S`: `KBD_FINNISH` becomes `KBD_US`
-- `/usr/src/0.95`: sources of the root diskette programs, a `Makefile` (`tools.mk`), and in `etc/` the inittab, rc, passwd, group, issue and securetty for the root diskette; for the hard disk install, `inst.sh.in` and `shoe/` (the 1992-01-17 Linux build of ShoeLace from `bin-src/shoelace.tar.Z`, plus a config holding only `boot /Image`); `gzip-1.1.1/` (the repo's `gzip-1.1.1`, plus `Makefile.l095`), built by build and put on tools.flp (the 1993 gzip binaries all need shared libraries, which 0.95 lacks)
+- `/usr/src/0.95`: sources of the root diskette programs, a `Makefile` (`tools.mk`), and in `etc/` the inittab, rc, passwd, group, issue and securetty for the root diskette; for the hard disk install, `inst.sh.in` and `shoe/` (the 1992-01-17 Linux build of ShoeLace from `bin-src/shoelace.tar.Z`, plus a config holding only `boot /Image`); `gzip-1.1.1/` (the repo's `gzip-1.1.1`: FreeBSD's import of 1993-06-18, commit 222b83e890, titled 1.1 but really 1.1.1, the first version with `.gz` by default; its BSD Makefile dropped, `Makefile.l095` added), built by build and put on tools.flp (the 1993 gzip binaries all need shared libraries, which 0.95 lacks)
 
 Root diskette programs and their sources:
 
