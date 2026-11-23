@@ -15,7 +15,8 @@ usage() {
     echo "  poe-IGL/        poeigl-1.2 init/getty/login (+ memory.h, sys/param.h and"
     echo "                  sys/resource.h from the 0.95 kernel, MAXPATHLEN in login.c)"
     echo "  system/         Linus's mkfs.c, mkswap.c, mknod.c (system-0.12.tar.Z)"
-    echo "  fdisk.c         0.95 fdisk (Linux-0.95/sources/sbin), lists partitions only"
+    echo "  fdisk.c         fdisk 0.91 (Linux-0.95/sources/sbin/fdisk-0.91.tar.Z), HDIO_REQ, fflush"
+    echo "  df.c            Linux-0.12/sources/usr.bin/df.c (Peter MacDonald)"
     echo "  mount.c umount.c  Linux-0.12/sources/sbin, lock file opened O_WRONLY"
     echo "  swapsrc/        Linux-0.12/sources/sbin/swapon.tar.Z, __NR_swapon 87"
     echo "  update.c        system-0.98.tar.Z;  sync.c  main() { sync(); }"
@@ -23,6 +24,8 @@ usage() {
     echo "  include/        string.h of the 0.95 kernel (include-0.12's fails with gcc 2.0 -O)"
     echo "  lib/libc.a      libc-0.12.a (the 0.12 HD has the 1991 gccbin libc), linked via -L"
     echo "  bison/          GNU Bison 1.14 binary, for getdate.y/posixtm.y (touch)"
+    echo "  bin/            vi (elvis 1.4, Linux-0.12/binaries/usr.bin/vi.Z), tar and compress"
+    echo "                  (images/rootimage-0.11-20040305), stripped"
     echo "  etc/            inittab rc passwd group issue securetty for the root diskette"
     echo "  Makefile        tools.mk"
     echo "Sources: an oldlinux-files tree. Patched files keep their 1992 timestamps."
@@ -59,7 +62,11 @@ tar xf "$SRC/Linux-0.95/sources/system/linux-0.95.tar" -C "$W/usr/src"
 gzip -dc "$SRC/Linux-0.12/sources/sbin/poeigl-1.2.tar.Z" | tar xf - -C "$D"
 gzip -dc "$SRC/Linux-0.12/sources/sbin/system-0.12.tar.Z" | tar xf - -C "$D" \
     system/mkfs.c system/mkswap.c system/mknod.c
-cp -p "$SRC/Linux-0.95/sources/sbin/fdisk.c" "$D/fdisk.c"
+gzip -dc "$SRC/Linux-0.95/sources/sbin/fdisk-0.91.tar.Z" | tar xf - -C "$W/x" fdisk/fdisk.c
+# fdisk 0.91 is dated 1992-04-01: date it like update.c
+cp "$W/x/fdisk/fdisk.c" "$D/fdisk.c"
+touch -d '1992-03-08 12:00' "$D/fdisk.c"
+cp -p "$SRC/Linux-0.12/sources/usr.bin/df.c" "$D/df.c"   # sbin/df.c is the same with CRLF
 gzip -dc "$SRC/Linux-0.12/sources/sbin/mount.c.Z" > "$D/mount.c"
 gzip -dc "$SRC/Linux-0.12/sources/sbin/umount.c.Z" > "$D/umount.c"
 touch -r "$SRC/Linux-0.12/sources/sbin/mount.c.Z" "$D/mount.c"
@@ -91,6 +98,48 @@ cp -p "$W/x/linux/include/sys/param.h" "$W/x/linux/include/sys/resource.h" "$D/p
 printf '#include <string.h>\n' > "$D/poe-IGL/memory.h"
 touch -d '1992-02-29 12:00' "$D/poe-IGL/memory.h"
 
+minixcat() {
+    python3 -I - "$1" "$2" <<'PYEOF'
+import sys, struct
+img = open(sys.argv[1], 'rb').read()
+B = lambda n: img[n*1024:(n+1)*1024]
+ni, nz, im, zm = struct.unpack('<HHHH', B(1)[:8]); it = 2 + im + zm
+def inode(n):
+    n -= 1; b = B(it + n // 32); o = (n % 32) * 32
+    m, u, s = struct.unpack('<HHI', b[o:o+8]); return s, struct.unpack('<9H', b[o+14:o+32])
+def data(z, s):
+    zs = list(z[:7]) + (list(struct.unpack('<512H', B(z[7]))) if z[7] else [])
+    return b''.join(B(q) if q else b'\0'*1024 for q in zs[:(s+1023)//1024])[:s]
+ino = 1
+for p in sys.argv[2].strip('/').split('/'):
+    d = data(*reversed(inode(ino)))
+    ino = next(struct.unpack('<H', d[i:i+2])[0] for i in range(0, len(d), 16)
+               if struct.unpack('<H', d[i:i+2])[0] and d[i+2:i+16].rstrip(b'\0').decode() == p)
+sys.stdout.buffer.write(data(*reversed(inode(ino))))
+PYEOF
+}
+
+aoutstrip() {
+    python3 -I - "$@" <<'PYEOF'
+import sys, struct
+for f in sys.argv[1:]:
+    d = bytearray(open(f, 'rb').read())
+    m, t, dd, bss, s, e, tr, dr = struct.unpack('<8I', d[:32])
+    if m & 0xffff != 0o413 or tr or dr or not s: continue
+    struct.pack_into('<I', d, 16, 0)
+    open(f, 'wb').write(d[:1024 + t + dd])
+PYEOF
+}
+
+# binaries for the root diskette: no source of these old enough (or at all) to build here
+mkdir -p "$D/bin"
+gzip -dc "$SRC/Linux-0.12/binaries/usr.bin/vi.Z" > "$D/bin/vi"
+for p in tar compress; do
+    minixcat "$SRC/images/rootimage-0.11-20040305" "/usr/bin/$p" > "$D/bin/$p"
+done
+aoutstrip "$D/bin/vi" "$D/bin/tar" "$D/bin/compress"
+chmod 755 "$D/bin/"*
+
 python3 -I - "$D" <<'PYEOF'
 import sys, os, time
 d = sys.argv[1]
@@ -110,6 +159,22 @@ patch('../linux/kernel/chr_drv/keyboard.S', '\n#define KBD_FINNISH\n', '\n#defin
 # own patch of 1992-03-02 (bin-src/poe-IGL.patch).
 patch('poe-IGL/login.c', '#define TTYGRPNAME      "other"\n',
       '#define TTYGRPNAME      "other"\n#include <limits.h>\n#define MAXPATHLEN _POSIX_PATH_MAX\n')
+
+# fdisk 0.91 wants HDIO_REQ from Owen's kernel ioctl.patch; the stock 0.95 kernel has no
+# hd_ioctl, so the ioctl just fails and geometry is set by hand (x h/s/c).
+patch('fdisk.c', '#include <linux/hdreg.h>\n', '''#include <linux/hdreg.h>
+#ifndef HDIO_REQ
+#define HDIO_REQ 0x301
+struct hd_geometry {
+	unsigned char heads;
+	unsigned char sectors;
+	unsigned short cylinders;
+};
+#endif
+''')
+
+# libc-0.12 does not flush stdout before reading stdin: every prompt showed up after the answer.
+patch('fdisk.c', '\t\tfputs(mesg, stdout);\n', '\t\tfputs(mesg, stdout), fflush(stdout);\n')
 
 # 0.95 sys_write checks f_mode: without O_WRONLY nothing reaches /etc/mtab.
 patch('mount.c', 'open(LOCK_FILE,O_CREAT | O_EXCL,0644)', 'open(LOCK_FILE,O_WRONLY | O_CREAT | O_EXCL,0644)')
@@ -173,7 +238,7 @@ libo = ('argmatch backupfile basename dirname eaccess error filemode getopt geto
         'xstrdup yesno getdate posixtm fnmatch stpcpy strdup fileblocks').split()
 progs = {'chgrp': ['chgrp'], 'chmod': ['chmod'], 'chown': ['chown'],
          'cp': ['cp', 'cp-aux', 'cp-hash'], 'ln': ['ln'], 'ls': ['ls'],
-         'mkdir': ['mkdir'], 'mv': ['mv'], 'rm': ['rm'], 'rmdir': ['rmdir'],
+         'dd': ['dd'], 'mkdir': ['mkdir'], 'mv': ['mv'], 'rm': ['rm'], 'rmdir': ['rmdir'],
          'touch': ['touch']}
 T = '\t'
 m = ['# Linux 0.12 + gcc 2.0 build of GNU fileutils 3.1 for the 0.95 root diskette',

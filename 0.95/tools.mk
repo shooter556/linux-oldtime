@@ -12,7 +12,7 @@ LDFLAGS = -L/usr/src/0.95/lib -Xlinker -s
 B = /usr/src/0.95/bison
 
 PROGS = poe-IGL/init poe-IGL/agetty poe-IGL/login \
-	system/mkfs system/mkswap system/mknod fdisk mount umount swapon sync update
+	system/mkfs system/mkswap system/mknod fdisk df mount umount swapon sync update
 
 all: $(PROGS) fileutils
 
@@ -47,6 +47,9 @@ system/mknod: system/mknod.c
 
 fdisk: fdisk.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o fdisk fdisk.c
+
+df: df.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o df df.c
 
 mount: mount.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o mount mount.c

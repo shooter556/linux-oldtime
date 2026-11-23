@@ -29,8 +29,9 @@ case "$2" in
 esac
 
 BIN="poe-IGL/init poe-IGL/agetty poe-IGL/login system/mkfs system/mkswap system/mknod"
-BIN="$BIN fdisk mount umount swapon sync"
-FU="ls cp mv rm ln mkdir rmdir chmod chown chgrp touch"
+BIN="$BIN fdisk df mount umount swapon sync"
+FU="ls cp mv rm ln mkdir rmdir chmod chown chgrp touch dd"
+XBIN="bin/vi bin/tar bin/compress"
 DEVS="PS0:b:2:28 PS1:b:2:29 at0:b:2:8 at1:b:2:9"
 DEVS="$DEVS hda:b:3:0 hda1:b:3:1 hda2:b:3:2 hda3:b:3:3 hda4:b:3:4"
 DEVS="$DEVS hda5:b:3:5 hda6:b:3:6 hda7:b:3:7 hda8:b:3:8"
@@ -61,7 +62,7 @@ boot)
   ;;
 root)
   if [ $DRY = 0 ]; then
-    for f in $BIN update; do [ -f $D/$f ] || { echo "no $D/$f, run build first"; exit 1; }; done
+    for f in $BIN $XBIN update; do [ -f $D/$f ] || { echo "no $D/$f, run build first"; exit 1; }; done
     for f in $FU; do [ -f $D/fileutils-3.1/src/$f ] || { echo "no $D/fileutils-3.1/src/$f"; exit 1; }; done
   fi
   [ -d $M ] || run "mkdir $M"
@@ -71,6 +72,7 @@ root)
   run "cp /bin/sh /usr/bin/cat $M/bin"
   run "(cd $D; cp $BIN $M/bin)"
   run "(cd $D/fileutils-3.1/src; cp $FU $M/bin)"
+  run "(cd $D; cp $XBIN $M/bin)"
   run "cp $D/update $D/etc/* /etc/termcap $M/etc"
   run "> $M/etc/mtab; > $M/etc/utmp; > $M/etc/wtmp"
   for d in $DEVS; do
