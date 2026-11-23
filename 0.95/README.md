@@ -17,7 +17,7 @@ oldlinux-files 里的 `bootimage-0.95` 是芬兰键盘，原版 `rootimage-0.95`
 | `mkbootroot.sh` | 主机端：生成源码盘 `br095.flp` |
 | `brinst.sh.in` | 源码盘里的 guest 脚本模板（bash 1.12） |
 | `tools.mk` | 在 guest 里成为 `/usr/src/0.95/Makefile`，编 root 盘上的程序和 gzip |
-| `gzip.mk` | 在 guest 里成为 `/usr/src/0.95/gzip-1.2.3/Makefile.l095`，代替 configure |
+| `gzip.mk` | 在 guest 里成为 `/usr/src/0.95/gzip-1.1.1/Makefile.l095`，代替 configure |
 | `inst.sh.in` | 0.95 硬盘安装脚本模板，由 `gccpkg` 写到 gcc.flp 开头 |
 
 主机需要：bash、python3、gzip、tar、`compress`（ncompress 包）。
@@ -29,7 +29,7 @@ oldlinux-files 里的 `bootimage-0.95` 是芬兰键盘，原版 `rootimage-0.95`
 - `/usr/src/linux`：原版 `linux-0.95.tar`，只改两处，都保留原时间戳：
   - `Makefile`：`ROOT_DEV=/dev/hdb1` 改成 `ROOT_DEV=FLOPPY`（原版 bootimage-0.95 偏移 508 也是 `00 00`）
   - `kernel/chr_drv/keyboard.S`：`KBD_FINNISH` 改成 `KBD_US`
-- `/usr/src/0.95`：root 盘程序的源码、`Makefile`（即 `tools.mk`），以及 `etc/` 下 root 盘用的 inittab、rc、passwd、group、issue、securetty；硬盘安装用的 `inst.sh.in` 和 `shoe/`（`bin-src/shoelace.tar.Z` 里 1992-01-17 的 Linux 版 ShoeLace 二进制，加一个只有 `boot /Image` 的 config）；`gzip-1.2.3/`（`distributions/TAMU/TAMU-1.0D/src/tar/gzip-1.2.3.tar.gz`，去掉 TAMU 生成的 Makefile、config.status，加 `Makefile.l095`），build 时编好放进 tools.flp（1993 年的 gzip 二进制都要共享库，0.95 用不了）
+- `/usr/src/0.95`：root 盘程序的源码、`Makefile`（即 `tools.mk`），以及 `etc/` 下 root 盘用的 inittab、rc、passwd、group、issue、securetty；硬盘安装用的 `inst.sh.in` 和 `shoe/`（`bin-src/shoelace.tar.Z` 里 1992-01-17 的 Linux 版 ShoeLace 二进制，加一个只有 `boot /Image` 的 config）；`gzip-1.1.1/`（仓库里的 `gzip-1.1.1`，加 `Makefile.l095`），build 时编好放进 tools.flp（1993 年的 gzip 二进制都要共享库，0.95 用不了）
 
 root 盘上的程序和来源：
 
@@ -84,7 +84,7 @@ root 盘的 `/dev`（0.95 新编号）：`PS0 PS1 at0 at1`、`hda hda1–8`（3,
 一套东西压缩后约 1.7M，分两张盘：
 
 - `gcc.flp`：开头 8 块是安装脚本（`inst.sh.in` 填上块数），后面是一个 compress 过的 tar：0.12 硬盘上的 gcc 2.0（`/usr/local`）、gccbin 的 as/ld 等、libc-0.12（作 `/usr/local/lib/libc.a`）、`/usr/include`（换上 0.95 内核的 `string.h`）、`/usr/bin/make`，以及 ShoeLace 和偏移 508 改成 `02 03` 的 `/Image`
-- `tools.flp`：0.12 硬盘 `/usr/bin` 里 root 盘没有的工具：grep egrep sed head tail cmp cut paste du split tac expand unexpand basename file stty uniq mkfifo dir vdir em kermit as86 ld86 等，加上 build 时编的 gzip 1.2.3
+- `tools.flp`：0.12 硬盘 `/usr/bin` 里 root 盘没有的工具：grep egrep sed head tail cmp cut paste du split tac expand unexpand basename file stty uniq mkfifo dir vdir em kermit as86 ld86 等，加上 build 时编的 gzip 1.1.1
 
 0.12 里（B = br095.flp，源码已 unpack、build）：
 
@@ -164,7 +164,7 @@ Tested on 86Box: the build and both diskettes are made in the 0.12 VM, a fresh 0
 | `mkbootroot.sh` | host: builds the source floppy `br095.flp` |
 | `brinst.sh.in` | guest script template stored on the source floppy (bash 1.12) |
 | `tools.mk` | becomes `/usr/src/0.95/Makefile` in the guest; builds the root diskette programs and gzip |
-| `gzip.mk` | becomes `/usr/src/0.95/gzip-1.2.3/Makefile.l095` in the guest, instead of configure |
+| `gzip.mk` | becomes `/usr/src/0.95/gzip-1.1.1/Makefile.l095` in the guest, instead of configure |
 | `inst.sh.in` | 0.95 hard disk installer template, written to the start of gcc.flp by `gccpkg` |
 
 Host needs: bash, python3, gzip, tar, `compress` (ncompress package).
@@ -176,7 +176,7 @@ Host needs: bash, python3, gzip, tar, `compress` (ncompress package).
 - `/usr/src/linux`: stock `linux-0.95.tar` with two changes, both keeping their timestamps:
   - `Makefile`: `ROOT_DEV=/dev/hdb1` becomes `ROOT_DEV=FLOPPY` (the original bootimage-0.95 also has `00 00` at offset 508)
   - `kernel/chr_drv/keyboard.S`: `KBD_FINNISH` becomes `KBD_US`
-- `/usr/src/0.95`: sources of the root diskette programs, a `Makefile` (`tools.mk`), and in `etc/` the inittab, rc, passwd, group, issue and securetty for the root diskette; for the hard disk install, `inst.sh.in` and `shoe/` (the 1992-01-17 Linux build of ShoeLace from `bin-src/shoelace.tar.Z`, plus a config holding only `boot /Image`); `gzip-1.2.3/` (`distributions/TAMU/TAMU-1.0D/src/tar/gzip-1.2.3.tar.gz` without TAMU's generated Makefile and config.status, plus `Makefile.l095`), built by build and put on tools.flp (the 1993 gzip binaries all need shared libraries, which 0.95 lacks)
+- `/usr/src/0.95`: sources of the root diskette programs, a `Makefile` (`tools.mk`), and in `etc/` the inittab, rc, passwd, group, issue and securetty for the root diskette; for the hard disk install, `inst.sh.in` and `shoe/` (the 1992-01-17 Linux build of ShoeLace from `bin-src/shoelace.tar.Z`, plus a config holding only `boot /Image`); `gzip-1.1.1/` (the repo's `gzip-1.1.1`, plus `Makefile.l095`), built by build and put on tools.flp (the 1993 gzip binaries all need shared libraries, which 0.95 lacks)
 
 Root diskette programs and their sources:
 
@@ -231,7 +231,7 @@ The disk follows the 0.95 VM: 128 cylinders, 16 heads, 63 sectors. gcc 2.0 needs
 Compressed, everything is about 1.7M, so it takes two floppies:
 
 - `gcc.flp`: the installer in the first 8 blocks (`inst.sh.in` with the block counts filled in), then a compressed tar: gcc 2.0 from the 0.12 hard disk (`/usr/local`), gccbin's as/ld and friends, libc-0.12 (as `/usr/local/lib/libc.a`), `/usr/include` (with the 0.95 kernel's `string.h`), `/usr/bin/make`, plus ShoeLace and `/Image` with `02 03` at offset 508
-- `tools.flp`: tools from the 0.12 `/usr/bin` that the root diskette lacks: grep egrep sed head tail cmp cut paste du split tac expand unexpand basename file stty uniq mkfifo dir vdir em kermit as86 ld86 and so on, plus gzip 1.2.3 built by build
+- `tools.flp`: tools from the 0.12 `/usr/bin` that the root diskette lacks: grep egrep sed head tail cmp cut paste du split tac expand unexpand basename file stty uniq mkfifo dir vdir em kermit as86 ld86 and so on, plus gzip 1.1.1 built by build
 
 On 0.12 (B = br095.flp, sources unpacked and built):
 

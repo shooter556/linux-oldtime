@@ -112,7 +112,7 @@ gccpkg)
   # tools.flp: the tools above plus gzip, built by "build"
   run "mkdir $T"
   run "(cd /; tar cf - $P) | (cd $T; tar xf -)"
-  run "cp $D/gzip-1.2.3/gzip $T/usr/bin"
+  run "cp $D/gzip-1.1.1/gzip $T/usr/bin"
   run "(cd $T; tar cf - usr) | compress > /tmp/tools.Z"
   run "rm -rf $T"
   if [ $DRY = 0 ]; then

@@ -72,4 +72,4 @@ fileutils:
 
 # not for the root diskette: gccpkg puts it on tools.flp
 gzip:
-	cd gzip-1.2.3; $(MAKE) -f Makefile.l095
+	cd gzip-1.1.1; $(MAKE) -f Makefile.l095
