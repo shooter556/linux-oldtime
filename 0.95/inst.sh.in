@@ -1,0 +1,118 @@
+# Linux 0.95 HD installer (bash 1.12), run from the 0.95 root diskette.
+# Written by "sh /tmp/br gccpkg" on 0.12. Read it from gcc.flp in drive B:
+#   dd if=/dev/PS1 of=/tmp/inst bs=1024 count=8
+FD=/dev/PS1
+HD=/dev/hda
+SWAP=/dev/hda1
+PART=/dev/hda2
+PN=2
+SWAP_CYL=16
+GCC_N=@GCC_N@
+TOOLS_N=@TOOLS_N@
+
+usage() {
+  echo "usage: sh /tmp/inst part    -n|--dry-run|-a|--apply CYLINDERS HEADS SECTORS"
+  echo "       sh /tmp/inst install -n|--dry-run|-a|--apply"
+  echo "  part     wipe $HD, $SWAP swap ($SWAP_CYL cyl), $PART Minix, reboot; skip if already so"
+  echo "  install  mkswap+swapon $SWAP, mkfs $PART, copy the root floppy, gcc.flp and tools.flp,"
+  echo "           ShoeLace (bootlace) on $PART and WiniBoot (default partition $PN) on $HD"
+  echo "  -n, --dry-run  print commands only;  -a, --apply  really run"
+  exit 1
+}
+
+run() {
+  echo "+ $*"
+  if [ $DRY = 0 ]; then eval "$*" || { echo "FAILED: $*"; exit 1; }; fi
+}
+
+# the root floppy has no grep/sed: parse fdisk output with bash only
+table() {
+  (echo p; echo q) | fdisk $HD > /tmp/ptab 2>&1
+  while read l; do case "$l" in ${HD}*) echo "$l" ;; esac; done < /tmp/ptab
+}
+
+# fields of one partition line: dev begin start end blocks id system
+pline() {
+  while read d r; do [ "$d" = "$1" ] && echo "$d $r"; done < /tmp/ptab
+}
+
+[ $# -ge 2 ] || usage
+CMD=$1
+case "$2" in
+  -n|--dry-run) DRY=1 ;;
+  -a|--apply) DRY=0 ;;
+  *) usage ;;
+esac
+
+case $CMD in
+part)
+  [ $# = 5 ] || usage
+  C=$3; H=$4; S=$5
+  let LAST=H*S*C-1
+  let SEND=H*S*SWAP_CYL-1
+  let RSTART=SEND+1
+  if [ $DRY = 0 ] && [ -n "`table`" ]; then
+    set -- `pline ${HD}1`; P1="$3 $4 $6"
+    set -- `pline ${HD}2`; P2="$3 $4"
+    if [ "$P1" = "$S $SEND 82" ] && [ "$P2" = "$RSTART $LAST" ] && [ -z "`pline ${HD}3`" ] && [ -z "`pline ${HD}4`" ]; then
+      echo "already partitioned as wanted, skip:"; table
+      run "rm -f /tmp/ptab"
+      echo "next: sh /tmp/inst install --apply"
+      exit 0
+    fi
+    echo "existing partitions, wiping them:"; table
+  fi
+  run "(echo x; echo h; echo $H; echo s; echo $S; echo c; echo $C; echo r; echo d; echo 4; echo d; echo 3; echo d; echo 2; echo d; echo 1; echo n; echo p; echo 1; echo $S; echo $SEND; echo n; echo p; echo 2; echo $RSTART; echo $LAST; echo t; echo 1; echo 82; echo w) | fdisk $HD"
+  if [ $DRY = 0 ]; then
+    echo "partition table now:"; table
+  fi
+  run "rm -f /tmp/ptab"
+  echo "next: wait 30s (/etc/update syncs), reboot with boot+root floppy, B=gcc.flp, then:"
+  echo "  dd if=$FD of=/tmp/inst bs=1024 count=8; sh /tmp/inst install --apply"
+  ;;
+install)
+  if [ $DRY = 0 ]; then
+    table > /dev/null
+    set -- `pline ${HD}1`; SBLOCKS=$5
+    set -- `pline ${HD}2`; BLOCKS=$5
+    rm -f /tmp/ptab
+    if [ -z "$SBLOCKS" ] || [ -z "$BLOCKS" ]; then
+      echo "need $SWAP and $PART in the partition table (run part, then reboot)"; exit 1
+    fi
+  else
+    SBLOCKS="<blocks of $SWAP>"
+    BLOCKS="<blocks of $PART>"
+  fi
+  run "mkswap $SWAP $SBLOCKS"
+  run "swapon $SWAP"
+  run "mkfs $PART $BLOCKS"
+  run "mount $PART /mnt"
+  run "mkdir /mnt/mnt /mnt/tmp"
+  run "cd /"
+  run "tar cf - bin dev etc usr | (cd /mnt; tar xf -)"
+  run "dd if=$FD bs=1024 skip=8 count=$GCC_N | compress -d | (cd /mnt; tar xvf -)"
+  if [ $DRY = 0 ]; then
+    echo -n "put tools.flp into drive B, then press Enter "; read a
+  fi
+  run "dd if=$FD bs=1024 count=$TOOLS_N | compress -d | (cd /mnt; tar xvf -)"
+  # fileutils ln has no symlink support here, so hard links (same filesystem)
+  for p in as ld ar ranlib nm size strip; do
+    run "ln /mnt/usr/local/lib/gcc-$p /mnt/usr/local/bin/$p"
+  done
+  run "ln /mnt/usr/local/lib/gcc-ar /mnt/usr/local/bin/gar"
+  run "ln /mnt/usr/local/lib/gcc/i386-gas-sysv/2.0/cpp /mnt/usr/local/bin/cpp"
+  run "echo 'PATH=/usr/local/bin:/bin:/usr/bin:/etc; export PATH' > /mnt/etc/profile"
+  run "(echo 'swapon $SWAP'; cat /etc/rc) > /mnt/etc/rc"
+  # laceup finds bootlace, winiboot and disktab in the current directory
+  run "cd /mnt/etc"
+  run "./laceup $PART wini"
+  run "./laceup -w $PN $HD"
+  run "cd /"
+  run "sync"
+  run "umount $PART"
+  echo "done. wait 30s (/etc/update syncs), power off, remove both floppies, boot."
+  echo "WiniBoot: press $PN, or wait about 15s for the default partition $PN."
+  ;;
+*) usage ;;
+esac
+exit 0

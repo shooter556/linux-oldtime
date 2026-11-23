@@ -28,6 +28,9 @@ usage() {
     echo "                  (images/rootimage-0.11-20040305), stripped"
     echo "  etc/            inittab rc passwd group issue securetty for the root diskette"
     echo "  Makefile        tools.mk"
+    echo "  inst.sh.in      0.95 HD installer, put on gcc.flp by \"sh /tmp/br gccpkg\""
+    echo "  shoe/           ShoeLace binaries (bin-src/shoelace.tar.Z, Linux build of 1992-01-17)"
+    echo "                  + config \"boot /Image\", put on gcc.flp to boot 0.95 from hda2"
     echo "Sources: an oldlinux-files tree. Patched files keep their 1992 timestamps."
     echo
     echo "  -s, --source DIR   oldlinux-files tree (default: \$OLDLINUX)"
@@ -82,6 +85,13 @@ gzip -dc "$SRC/Linux-0.12/binaries/compilers/bison.tar.Z" | tar xf - -C "$W/x"
 B=$(dirname "$(find "$W/x" -type f -name bison)")
 cp -p "$B/bison" "$B/bison.simple" "$B/bison.hairy" "$D/bison/"
 cp "$HERE/tools.mk" "$D/Makefile"
+cp "$HERE/inst.sh.in" "$D/inst.sh.in"
+# ShoeLace boots /Image from the hda2 Minix fs (WiniBoot in the MBR, bootlace in hda2's boot block)
+mkdir -p "$D/shoe"
+gzip -dc "$SRC/bin-src/shoelace.tar.Z" | tar xf - -C "$W/x" shoe
+for f in shoelace laceup bootlace winiboot disktab; do cp -p "$W/x/shoe/$f" "$D/shoe/"; done
+printf '# ShoeLace for Linux 0.95: load /Image (its ROOT_DEV at offset 508 is 0x0302 = /dev/hda2)\nboot\t\t/Image\n' \
+    > "$D/shoe/config"
 touch -d '1992-03-08 12:00' "$D/Makefile"
 chmod -R u+rwX,go+rX "$D"
 chmod 755 "$D/bison/bison"
@@ -304,12 +314,12 @@ tar --format=v7 --owner=0 --group=0 -cf "$W/pkg.tar" -C "$W" usr
 compress -c "$W/pkg.tar" > "$W/pkg.tar.Z"
 
 blocks() { echo $(( ($(stat -c%s "$1") + 1023) / 1024 )); }
-SCRIPT_N=4
+SCRIPT_N=6
 PKG_O=$SCRIPT_N PKG_N=$(blocks "$W/pkg.tar.Z")
 [ $((PKG_O + PKG_N)) -le 1440 ] || { echo "[ERROR] needs $((PKG_O + PKG_N)) blocks > 1440" >&2; exit 1; }
 
 sed -e "s/@SCRIPT_N@/$SCRIPT_N/; s/@PKG_O@/$PKG_O/; s/@PKG_N@/$PKG_N/" "$HERE/brinst.sh.in" > "$W/br"
-! grep -n '@[A-Z_]*@' "$W/br" || { echo "[ERROR] unreplaced placeholder" >&2; exit 1; }
+! grep -n -E "@(SCRIPT_N|PKG_O|PKG_N)@" "$W/br" || { echo "[ERROR] unreplaced placeholder" >&2; exit 1; }
 [ $(blocks "$W/br") -le $SCRIPT_N ] || { echo "[ERROR] script > $SCRIPT_N KB" >&2; exit 1; }
 
 dd if=/dev/zero of="$OUT" bs=1024 count=1440 status=none

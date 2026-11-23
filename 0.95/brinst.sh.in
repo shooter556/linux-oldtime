@@ -7,11 +7,13 @@ L=/usr/src/linux
 M=/mnt
 
 usage() {
-  echo "usage: sh /tmp/br unpack|build|boot|root -n|--dry-run|-a|--apply"
+  echo "usage: sh /tmp/br unpack|build|boot|root|gccpkg -n|--dry-run|-a|--apply"
   echo "  unpack  unpack the package from drive B into $L and $D"
   echo "  build   make the root diskette programs, then the 0.95 kernel"
   echo "  boot    write $L/Image to the blank floppy in drive B"
   echo "  root    mkfs the blank floppy in drive B and fill it as the 0.95 root diskette"
+  echo "  gccpkg  write gcc 2.0 + /usr/include + make + ShoeLace and Image (gcc.flp, with the 0.95 HD installer)"
+  echo "          and the extra tools (tools.flp) from this disk to blank floppies in drive B"
   echo "  -n, --dry-run  print commands only;  -a, --apply  really run"
   exit 1
 }
@@ -32,6 +34,10 @@ BIN="poe-IGL/init poe-IGL/agetty poe-IGL/login system/mkfs system/mkswap system/
 BIN="$BIN fdisk df mount umount swapon sync"
 FU="ls cp mv rm ln mkdir rmdir chmod chown chgrp touch dd"
 XBIN="bin/vi bin/tar bin/compress"
+GCC="usr/local/bin/gcc usr/local/lib/gcc usr/local/lib/crt0.o usr/include usr/bin/make"
+for p in as ld ar ranlib nm size strip; do GCC="$GCC usr/local/lib/gcc-$p"; done
+TOOLS="basename file magic grep egrep sed stty uniq cmp cut du head tail paste mkfifo"
+TOOLS="$TOOLS split tac expand unexpand dir vdir em kermit as86 ld86"
 DEVS="PS0:b:2:28 PS1:b:2:29 at0:b:2:8 at1:b:2:9"
 DEVS="$DEVS hda:b:3:0 hda1:b:3:1 hda2:b:3:2 hda3:b:3:3 hda4:b:3:4"
 DEVS="$DEVS hda5:b:3:5 hda6:b:3:6 hda7:b:3:7 hda8:b:3:8"
@@ -85,6 +91,54 @@ root)
   run "sync"
   run "umount $FD"
   echo "done: boot from the boot diskette, insert the root diskette when asked"
+  ;;
+gccpkg)
+  # blocks of a file: dd conv=sync pads the last block, so "N+0 records out" counts it
+  nblk() { dd if=$1 of=/dev/null bs=1024 conv=sync 2>&1 | sed -n 's/+.* records out$//p'; }
+  T=/tmp/gp
+  [ -d $T ] && run "rm -rf $T"
+  run "mkdir $T"
+  run "(cd /; tar cf - $GCC) | (cd $T; tar xf -)"
+  run "cp $D/lib/libc.a $T/usr/local/lib/libc.a"
+  run "cp $D/include/string.h $T/usr/include/string.h"
+  run "mkdir $T/etc"
+  run "cp $D/shoe/shoelace $T"
+  run "(cd $D/shoe; cp laceup bootlace winiboot disktab config $T/etc)"
+  # ShoeLace ignores rootdev: the Image itself must say /dev/hda2 (0x0302) at offset 508
+  run "(dd if=$L/Image bs=508 count=1; echo -n -e '\002\003'; dd if=$L/Image bs=510 skip=1) > $T/Image"
+  run "(cd $T; tar cf - usr etc shoelace Image) | compress > /tmp/gcc.Z"
+  run "rm -rf $T"
+  P=""; for p in $TOOLS; do P="$P usr/bin/$p"; done
+  run "(cd /; tar cf - $P) | compress > /tmp/tools.Z"
+  if [ $DRY = 0 ]; then
+    GN=`nblk /tmp/gcc.Z`; TN=`nblk /tmp/tools.Z`
+    let GE=GN+8
+    [ $GE -le 1440 ] && [ $TN -le 1440 ] || { echo "too big: gcc $GN, tools $TN blocks"; exit 1; }
+  else
+    GN="<blocks of /tmp/gcc.Z>"; TN="<blocks of /tmp/tools.Z>"
+  fi
+  run "sed -e 's/@GCC_N@/$GN/; s/@TOOLS_N@/$TN/' $D/inst.sh.in > /tmp/inst"
+  # gcc.flp: installer in blocks 0-7, gcc.Z from block 8
+  if [ $DRY = 0 ]; then
+    IN=`nblk /tmp/inst`
+    [ $IN -le 8 ] || { echo "installer too big: $IN blocks"; exit 1; }
+  fi
+  if [ $DRY = 0 ]; then
+    echo -n "blank floppy for gcc.flp in drive B? [y/N] "; read a
+    [ "$a" = y ] || exit 1
+  fi
+  run "dd if=/tmp/inst of=$FD bs=1024 conv=sync"
+  run "dd if=/tmp/gcc.Z of=$FD bs=1024 seek=8"
+  run "sync"
+  if [ $DRY = 0 ]; then
+    echo -n "blank floppy for tools.flp in drive B? [y/N] "; read a
+    [ "$a" = y ] || exit 1
+  fi
+  run "dd if=/tmp/tools.Z of=$FD bs=1024"
+  run "sync"
+  run "rm -f /tmp/gcc.Z /tmp/tools.Z /tmp/inst"
+  echo "done: gcc.flp $GN+8 blocks, tools.flp $TN blocks"
+  echo "on 0.95 (boot+root floppy, B=gcc.flp): dd if=/dev/PS1 of=/tmp/inst bs=1024 count=8"
   ;;
 *)
   usage ;;
