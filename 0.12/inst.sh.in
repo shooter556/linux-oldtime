@@ -4,15 +4,15 @@ FD=/dev/fd1
 HD=/dev/hd0
 SWAP=/dev/hd1
 PART=/dev/hd2
+PN=2
 SWAP_CYL=16
 
 usage() {
   echo "usage: sh /tmp/inst part    -n|--dry-run|-a|--apply CYLINDERS HEADS SECTORS"
   echo "       sh /tmp/inst install -n|--dry-run|-a|--apply"
-  echo "       sh /tmp/inst rootdev -n|--dry-run|-a|--apply"
   echo "  part     wipe $HD, $SWAP swap ($SWAP_CYL cyl), $PART Minix, reboot; skip if already so"
-  echo "  install  mkswap $SWAP, mkfs $PART, copy root floppy + packages onto it"
-  echo "  rootdev  set SWAP_DEV=0x0301, ROOT_DEV=0x0302 on the boot floppy in drive B"
+  echo "  install  mkswap $SWAP, mkfs $PART, copy root floppy + packages onto it, kernel from the"
+  echo "           boot floppy as /Image, ShoeLace on $PART and WiniBoot (default partition $PN) on $HD"
   echo "  -n, --dry-run  print commands only;  -a, --apply  really run"
   exit 1
 }
@@ -113,20 +113,22 @@ install)
   run "cd /"
   run "/mnt/bin/tar cf - bin dev etc usr | (cd /mnt; /mnt/bin/tar xf -)"
   run "dd if=$FD bs=1024 skip=@PKG_O@ count=@PKG_N@ | /mnt/bin/compress -d | (cd /mnt; /mnt/bin/tar xvf -)"
+  if [ $DRY = 0 ]; then
+    echo -n "put boot.flp into drive B, then press Enter "; read a
+  fi
+  run "echo -n -e '\001\003\002\003' | dd of=$FD bs=1 seek=506 count=4"
+  run "dd if=$FD of=/mnt/Image bs=512 count=@IMAGE_S@"
+  run "cd /mnt/etc"
+  run "./laceup $PART wini"
+  run "./laceup -w $PN $HD"
+  run "cd /"
+  run "/mnt/bin/sync"
   run "cp /mnt/bin/umount /tmp/umount"
   run "chmod 755 /tmp/umount"
   run "/tmp/umount $PART"
   run "rm -f /tmp/umount"
-  echo "next: put boot.flp into drive B, then:"
-  echo "  sh /tmp/inst rootdev --apply"
-  ;;
-rootdev)
-  if [ $DRY = 0 ]; then
-    echo -n "boot floppy in drive B? [y/N] "; read a
-    [ "$a" = y ] || exit 1
-  fi
-  run "echo -n -e '\001\003\002\003' | dd of=$FD bs=1 seek=506 count=4"
-  echo "done. wait 30s (/etc/update syncs), power off, A=boot.flp, B empty, boot."
+  echo "done. wait 30s (/etc/update syncs), power off, remove both floppies, boot."
+  echo "WiniBoot: press $PN, or wait about 15s for the default partition $PN."
   ;;
 *) usage ;;
 esac

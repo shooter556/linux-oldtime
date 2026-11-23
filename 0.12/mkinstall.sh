@@ -31,12 +31,13 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$OUT" ] || usage
 [ -d "$SRC/Linux-0.12" ] || { echo "[ERROR] not an oldlinux-files tree: '$SRC' (use -s)" >&2; exit 1; }
+[ -f "$SRC/Linux-0.12/images/bootimage-0.12.Z" ] || { echo "[ERROR] no Linux-0.12/images/bootimage-0.12.Z in '$SRC'" >&2; exit 1; }
 [ ! -e "$OUT" ] || [ $FORCE = 1 ] || { echo "[ERROR] $OUT exists (use -f)" >&2; exit 1; }
 command -v compress >/dev/null || { echo "[ERROR] need ncompress (compress)" >&2; exit 1; }
 
 W=$(mktemp -d)
 trap 'rm -rf "$W"' EXIT
-mkdir -p "$W/bin" "$W/all/bin" "$W/all/usr/bin" "$W/all/usr/include" "$W/all/usr/local/bin" "$W/all/usr/local/lib"
+mkdir -p "$W/bin" "$W/all/bin" "$W/all/etc" "$W/all/usr/bin" "$W/all/usr/include" "$W/all/usr/local/bin" "$W/all/usr/local/lib"
 
 minixcat() {
     python3 -I - "$1" "$2" <<'PYEOF'
@@ -100,9 +101,17 @@ done
 aoutstrip "$W/all/usr/bin/"*
 mv "$W/x/gccbin/gcc" "$W/all/usr/local/bin/"
 mv "$W/x/gccbin/"* "$W/all/usr/local/lib/"
+gzip -dc "$SRC/bin-src/shoelace.tar.Z" | tar xf - -C "$W/x" shoe
+cp -p "$W/x/shoe/shoelace" "$W/all/shoelace"
+for f in laceup bootlace winiboot disktab; do cp -p "$W/x/shoe/$f" "$W/all/etc/"; done
+chmod 755 "$W/all/shoelace" "$W/all/etc/laceup"
+chmod 644 "$W/all/etc/bootlace" "$W/all/etc/winiboot" "$W/all/etc/disktab"
+aoutstrip "$W/all/etc/laceup"
+printf '# ShoeLace for Linux 0.12: load /Image (its ROOT_DEV at offset 508 is 0x0302 = /dev/hd2)\nboot\t\t/Image\n' > "$W/all/etc/config"
+IMAGE_S=$(( ($(gzip -dc "$SRC/Linux-0.12/images/bootimage-0.12.Z" | wc -c) + 511) / 512 ))
 cp -rp "$W/x/include-0.12/." "$W/all/usr/include/"
 tar xf "$SRC/kernel/0.1x/linux-0.12.tar" -C "$W/all/usr/include" --strip-components=2 linux-0.12/include/utime.h
-tar --format=v7 --owner=0 --group=0 -cf "$W/all.tar" -C "$W/all" bin usr
+tar --format=v7 --owner=0 --group=0 -cf "$W/all.tar" -C "$W/all" bin etc shoelace usr
 
 for f in fdisk mkfs mount tar; do compress -c "$W/bin/$f" > "$W/$f.Z"; done
 compress -c "$W/all.tar" > "$W/all.tar.Z"
@@ -123,6 +132,7 @@ sed -e "s/@SCRIPT_N@/$SCRIPT_N/" \
     -e "s/@MOUNT_O@/${O[mount]}/; s/@MOUNT_N@/${N[mount]}/" \
     -e "s/@TAR_O@/${O[tar]}/; s/@TAR_N@/${N[tar]}/" \
     -e "s/@PKG_O@/${O[pkg]}/; s/@PKG_N@/${N[pkg]}/" \
+    -e "s/@IMAGE_S@/$IMAGE_S/" \
     "$HERE/inst.sh.in" > "$W/inst"
 ! grep -n '@[A-Z_]*@' "$W/inst" || { echo "[ERROR] unreplaced placeholder" >&2; exit 1; }
 [ $(blocks "$W/inst") -le $SCRIPT_N ] || { echo "[ERROR] script > $SCRIPT_N KB" >&2; exit 1; }

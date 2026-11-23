@@ -26,7 +26,7 @@
 
 两张盘都是 **raw** 盘（没有文件系统）。0.12 原版 root 盘上没有 mount、tar、mkfs，guest 里只能用 `dd skip=… count=…` 按 1K 块偏移取文件。盘的开头是 guest 脚本，脚本里已经写好了各段的偏移。
 
-`install.flp`（约 1371/1440 块）：
+`install.flp`（约 1421/1440 块）：
 
 - `compress`：原样存放，后面所有 `.Z` 都靠它解压
 - `fdisk`、`mkfs`、`mount`、`tar`：各自压缩成 `.Z`
@@ -35,6 +35,7 @@
   - root 盘上没有的程序：make、egrep、kermit、em、dir、vdir、expand、unexpand、split、tac、as86、ld86
   - gcc 1.40：`/usr/local/bin/gcc` 和 `/usr/local/lib/gcc-*`、crt0.o、libc.a、gnulib
   - `/usr/include`
+  - ShoeLace（`bin-src/shoelace.tar.Z`，1992-01-17 的 Linux 版）：`/shoelace`、`/etc/{laceup,bootlace,winiboot,disktab}`，另有生成的 `/etc/config`（`boot /Image`）
 
 `kernel.flp`：用 `git archive` 从 Linux 历史仓库（[history.git](https://git.kernel.org/pub/scm/linux/kernel/git/history/history.git)，tag 形如 `0.12`、`0.95`）导出指定 tag 的原版源码，不做任何修改，解到 `/usr/src/linux`：
 
@@ -69,11 +70,15 @@ dd if=/dev/fd1 of=/tmp/inst bs=1024 count=5
 sh /tmp/inst part --apply 128 16 63     # 柱面 磁头 扇区；fdisk 由管道驱动，建 hd1 swap（16 柱面）、hd2 root
                                         # 已有分区会先全部删掉；已是目标布局则跳过，可重复执行
                                         # 等 30 秒，重启（0.12 只在开机时读分区表）
-sh /tmp/inst install --apply            # mkswap hd1、mkfs hd2、拷 root 盘、解软件包、umount
-                                        # B 换成 boot 盘
-sh /tmp/inst rootdev --apply            # SWAP_DEV（偏移 506）写 0x0301、ROOT_DEV（偏移 508）写 0x0302
-                                        # 等 30 秒，关机，只放 boot 盘启动
+sh /tmp/inst install --apply            # mkswap hd1、mkfs hd2、拷 root 盘、解软件包；中途提示时 B 换成 boot 盘
+                                        # 再写 boot 盘的 SWAP_DEV（偏移 506）0x0301、ROOT_DEV（偏移 508）0x0302，
+                                        # 拷成 hd2 的 /Image，laceup 装 ShoeLace 和 WiniBoot，umount
+                                        # 等 30 秒，关机，取出两张软盘，从硬盘启动
 ```
+
+`install` 的最后几步和 0.95 一样：`laceup /dev/hd2 wini`（bootlace 写进 hd2 的引导块）、`laceup -w 2 /dev/hd0`（WiniBoot 写进 MBR，保留分区表，默认第 2 分区）。内核 `/Image` 是从 B 里的 boot 盘取的前 285 个扇区（`bootimage-0.12` 的大小，`mkinstall.sh` 按 `Linux-0.12/images/bootimage-0.12.Z` 算出来填进脚本），所以 boot 盘必须是这个 `bootimage-0.12`；换内核时偏移 506–509 也要是 `01 03 02 03`，ShoeLace 不设根设备，用的是 Image 里的值。
+
+从硬盘启动：WiniBoot 显示分区表和 `Boot:`，按 `1`–`4` 立刻启动对应分区（不用回车），约 15 秒不按就启动默认分区；ShoeLace 读 `/etc/config`，载入 `/Image`。改了 `/etc/config` 不用重装；千万别对 `/dev/hd0` 跑不带 `-w` 的 laceup，会覆盖分区表。
 
 每个子命令都可以先用 `--dry-run` 只打印命令。
 
@@ -168,7 +173,7 @@ Host requirements: bash, python3, gzip, tar, `compress` (ncompress); `mkgcc20.sh
 
 Both floppies are **raw** (no filesystem). The stock 0.12 root diskette has no mount, tar or mkfs, so files are pulled out in the guest with `dd skip=… count=…` at 1K-block offsets. Each floppy starts with the guest script, which already contains those offsets.
 
-`install.flp` (about 1371/1440 blocks):
+`install.flp` (about 1421/1440 blocks):
 
 - `compress`, stored plain; every `.Z` below is unpacked with it
 - `fdisk`, `mkfs`, `mount`, `tar`, each compressed to `.Z`
@@ -177,6 +182,7 @@ Both floppies are **raw** (no filesystem). The stock 0.12 root diskette has no m
   - programs missing from the root diskette: make, egrep, kermit, em, dir, vdir, expand, unexpand, split, tac, as86, ld86
   - gcc 1.40: `/usr/local/bin/gcc` and `/usr/local/lib/gcc-*`, crt0.o, libc.a, gnulib
   - `/usr/include`
+  - ShoeLace (`bin-src/shoelace.tar.Z`, the Linux build of 1992-01-17): `/shoelace`, `/etc/{laceup,bootlace,winiboot,disktab}`, plus a generated `/etc/config` (`boot /Image`)
 
 `kernel.flp`: the stock source of one tag, exported unmodified with `git archive` from the Linux history repo ([history.git](https://git.kernel.org/pub/scm/linux/kernel/git/history/history.git), tags such as `0.12`, `0.95`) and unpacked to `/usr/src/linux`:
 
@@ -211,11 +217,15 @@ dd if=/dev/fd1 of=/tmp/inst bs=1024 count=5
 sh /tmp/inst part --apply 128 16 63     # cylinders heads sectors; fdisk fed through a pipe, hd1 swap (16 cyl), hd2 root
                                         # wipes any existing partitions; skips if already laid out, so it can be rerun
                                         # wait 30 s, reboot (0.12 reads the partition table only at boot)
-sh /tmp/inst install --apply            # mkswap hd1, mkfs hd2, copy the root diskette, unpack the package, umount
-                                        # put the boot diskette into B
-sh /tmp/inst rootdev --apply            # write SWAP_DEV = 0x0301 at offset 506, ROOT_DEV = 0x0302 at 508
-                                        # wait 30 s, power off, boot from the boot diskette alone
+sh /tmp/inst install --apply            # mkswap hd1, mkfs hd2, copy the root diskette, unpack the package; at the prompt put the boot diskette into B
+                                        # then write SWAP_DEV = 0x0301 at offset 506 and ROOT_DEV = 0x0302 at 508 on it,
+                                        # copy it to hd2 as /Image, laceup installs ShoeLace and WiniBoot, umount
+                                        # wait 30 s, power off, remove both floppies, boot from the hard disk
 ```
+
+The last steps of `install` are the same as on 0.95: `laceup /dev/hd2 wini` (bootlace into hd2's boot block) and `laceup -w 2 /dev/hd0` (WiniBoot into the MBR, partition table kept, default partition 2). `/Image` is the first 285 sectors of the boot diskette in B (the size of `bootimage-0.12`, which `mkinstall.sh` works out from `Linux-0.12/images/bootimage-0.12.Z` and fills into the script), so the boot diskette must hold this `bootimage-0.12`. For another kernel, offsets 506–509 must also be `01 03 02 03`: ShoeLace does not set the root device and uses the value in the Image.
+
+Booting from the hard disk: WiniBoot shows the partition table and `Boot:`. `1`–`4` boots that partition at once (no Enter); after about 15 seconds it boots the default partition. ShoeLace reads `/etc/config` and loads `/Image`. Changing `/etc/config` needs no reinstall; never run laceup on `/dev/hd0` without `-w`, it overwrites the partition table.
 
 Every sub-command accepts `--dry-run` to print the commands without running them.
 
