@@ -13,7 +13,7 @@ usage() {
   echo "  boot    write $L/Image to the blank floppy in drive B"
   echo "  root    mkfs the blank floppy in drive B and fill it as the 0.95 root diskette"
   echo "  gccpkg  write gcc 2.0 + /usr/include + make + ShoeLace and Image (gcc.flp, with the 0.95 HD installer)"
-  echo "          and the extra tools (tools.flp) from this disk to blank floppies in drive B"
+  echo "          and the extra tools + gzip (tools.flp) from this disk to blank floppies in drive B"
   echo "  -n, --dry-run  print commands only;  -a, --apply  really run"
   exit 1
 }
@@ -109,7 +109,12 @@ gccpkg)
   run "(cd $T; tar cf - usr etc shoelace Image) | compress > /tmp/gcc.Z"
   run "rm -rf $T"
   P=""; for p in $TOOLS; do P="$P usr/bin/$p"; done
-  run "(cd /; tar cf - $P) | compress > /tmp/tools.Z"
+  # tools.flp: the tools above plus gzip, built by "build"
+  run "mkdir $T"
+  run "(cd /; tar cf - $P) | (cd $T; tar xf -)"
+  run "cp $D/gzip-1.2.3/gzip $T/usr/bin"
+  run "(cd $T; tar cf - usr) | compress > /tmp/tools.Z"
+  run "rm -rf $T"
   if [ $DRY = 0 ]; then
     GN=`nblk /tmp/gcc.Z`; TN=`nblk /tmp/tools.Z`
     let GE=GN+8

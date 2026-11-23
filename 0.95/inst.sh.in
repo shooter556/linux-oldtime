@@ -95,6 +95,8 @@ install)
     echo -n "put tools.flp into drive B, then press Enter "; read a
   fi
   run "dd if=$FD bs=1024 count=$TOOLS_N | compress -d | (cd /mnt; tar xvf -)"
+  run "ln /mnt/usr/bin/gzip /mnt/usr/bin/gunzip"
+  run "ln /mnt/usr/bin/gzip /mnt/usr/bin/zcat"
   # fileutils ln has no symlink support here, so hard links (same filesystem)
   for p in as ld ar ranlib nm size strip; do
     run "ln /mnt/usr/local/lib/gcc-$p /mnt/usr/local/bin/$p"

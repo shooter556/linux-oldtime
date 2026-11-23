@@ -21,6 +21,7 @@ usage() {
     echo "  swapsrc/        Linux-0.12/sources/sbin/swapon.tar.Z, __NR_swapon 87"
     echo "  update.c        system-0.98.tar.Z;  sync.c  main() { sync(); }"
     echo "  fileutils-3.1/  GNU fileutils 3.1 + Makefile.l095 (only the root diskette programs)"
+    echo "  gzip-1.2.3/     gzip 1.2.3 source (TAMU 1.0D) + Makefile.l095 (gzip.mk); for tools.flp"
     echo "  include/        string.h of the 0.95 kernel (include-0.12's fails with gcc 2.0 -O)"
     echo "  lib/libc.a      libc-0.12.a (the 0.12 HD has the 1991 gccbin libc), linked via -L"
     echo "  bison/          GNU Bison 1.14 binary, for getdate.y/posixtm.y (touch)"
@@ -84,6 +85,10 @@ gzip -dc "$SRC/Linux-0.12/sources/usr.bin/fileutils-3.1.tar.Z" | tar xf - -C "$D
 gzip -dc "$SRC/Linux-0.12/binaries/compilers/bison.tar.Z" | tar xf - -C "$W/x"
 B=$(dirname "$(find "$W/x" -type f -name bison)")
 cp -p "$B/bison" "$B/bison.simple" "$B/bison.hairy" "$D/bison/"
+gzip -dc "$SRC/distributions/TAMU/TAMU-1.0D/src/tar/gzip-1.2.3.tar.gz" | tar xf - -C "$W/x" ./bin/gzip-1.2.3
+mv "$W/x/bin/gzip-1.2.3" "$D/gzip-1.2.3"
+rm "$D/gzip-1.2.3/Makefile" "$D/gzip-1.2.3/config.status"   # TAMU's configure output
+cp "$HERE/gzip.mk" "$D/gzip-1.2.3/Makefile.l095"
 cp "$HERE/tools.mk" "$D/Makefile"
 cp "$HERE/inst.sh.in" "$D/inst.sh.in"
 # ShoeLace boots /Image from the hda2 Minix fs (WiniBoot in the MBR, bootlace in hda2's boot block)

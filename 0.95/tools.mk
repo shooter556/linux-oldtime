@@ -14,7 +14,7 @@ B = /usr/src/0.95/bison
 PROGS = poe-IGL/init poe-IGL/agetty poe-IGL/login \
 	system/mkfs system/mkswap system/mknod fdisk df mount umount swapon sync update
 
-all: $(PROGS) fileutils
+all: $(PROGS) fileutils gzip
 
 poe-IGL/init: poe-IGL/simpleinit.c
 	cd poe-IGL; $(CC) $(CFLAGS) -I. $(LDFLAGS) -o init simpleinit.c
@@ -69,3 +69,7 @@ update: update.c
 fileutils:
 	cd fileutils-3.1; BISON_SIMPLE=$(B)/bison.simple BISON_HAIRY=$(B)/bison.hairy \
 		$(MAKE) -f Makefile.l095 BISON=$(B)/bison
+
+# not for the root diskette: gccpkg puts it on tools.flp
+gzip:
+	cd gzip-1.2.3; $(MAKE) -f Makefile.l095
