@@ -110,6 +110,11 @@ aoutstrip "$W/all/etc/laceup"
 printf '# ShoeLace for Linux 0.12: load /Image (its ROOT_DEV at offset 508 is 0x0302 = /dev/hd2)\nboot\t\t/Image\n' > "$W/all/etc/config"
 IMAGE_S=$(( ($(gzip -dc "$SRC/Linux-0.12/images/bootimage-0.12.Z" | wc -c) + 511) / 512 ))
 cp -rp "$W/x/include-0.12/." "$W/all/usr/include/"
+sed -i -e 's/^extern inline int strlen(/extern inline size_t strlen(/' \
+    -e 's/^\(extern inline void \* memcpy(void \* dest,const void \* src, \)int n)/\1size_t n)/' \
+    -e 's/^\(extern inline int memcmp(const void \* cs,const void \* ct,\)int count)/\1size_t count)/' \
+    "$W/all/usr/include/string.h"
+[ "$(grep -c -E '^extern inline size_t strlen\(|memcpy\(.*size_t n\)|memcmp\(.*size_t count\)' "$W/all/usr/include/string.h")" = 3 ] || { echo "[ERROR] string.h prototypes not patched" >&2; exit 1; }
 tar xf "$SRC/kernel/0.1x/linux-0.12.tar" -C "$W/all/usr/include" --strip-components=2 linux-0.12/include/utime.h
 tar --format=v7 --owner=0 --group=0 -cf "$W/all.tar" -C "$W/all" bin etc shoelace usr
 

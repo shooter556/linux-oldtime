@@ -132,7 +132,7 @@ cp /usr/src/gcc/tools/float.h.ieee /usr/local/lib/gcc/i386-gas-sysv/2.0/include/
 - 必须打开 387。gcc 2.0 默认生成 387 代码，0.12 的 387 模拟不完整。
 - BIOS 日期必须晚于 1992-02-22（源码里最新文件的日期），否则 make 会反复重新生成 Makefile。
 - gcc 2.0 只提供驱动、cpp、cc1、libgcc.a 和头文件；as、ld、ar 等仍是 gccbin（1991）里的。
-- 0.95 内核里有大量 `conflicting types for built-in function` 警告（strlen、memcpy、memcmp）：gcc 2.0 默认的 `size_t` 是 `long unsigned int`，内核是 `unsigned int`，i386 上一样，可以忽略。`mkgcc20.sh` 在 `config/i386gas.h` 里加了 `#define SIZE_TYPE "unsigned int"`，用这版 `gccsrc*.flp` 自举出来的 gcc 2.0 不会再报；更早做的盘自举出来的仍会报。
+- 0.95 内核里有大量 `conflicting types for built-in function` 警告（strlen、memcpy、memcmp）：gcc 2.0 默认的 `size_t` 是 `long unsigned int`，内核是 `unsigned int`，i386 上一样，可以忽略。`mkgcc20.sh` 在 `config/i386gas.h` 里加了 `#define SIZE_TYPE "unsigned int"`，用这版 `gccsrc*.flp` 自举出来的 gcc 2.0 不会再报；更早做的盘自举出来的仍会报。另外 0.12 自带的 `/usr/include/string.h` 把 `strlen` 的返回值、`memcpy`/`memcmp` 的长度都写成 `int`，同样和内建声明冲突，`mkinstall.sh` 打包时把这三处改成了 `size_t`。
 - 0.95 不再读 boot 盘偏移 506 的 SWAP_DEV，要用 swapon。
 
 ### 遇到的坑
@@ -280,7 +280,7 @@ Notes:
 - The 387 must be enabled. gcc 2.0 emits 387 code by default and the 0.12 387 emulation is incomplete.
 - The BIOS date must be after 1992-02-22 (the newest file in the source), or make keeps regenerating the Makefile.
 - gcc 2.0 provides only the driver, cpp, cc1, libgcc.a and headers; as, ld, ar etc. are still the ones from gccbin (1991).
-- The 0.95 build prints many `conflicting types for built-in function` warnings (strlen, memcpy, memcmp): gcc 2.0's default `size_t` is `long unsigned int`, the kernel's is `unsigned int`; identical on i386, harmless. `mkgcc20.sh` adds `#define SIZE_TYPE "unsigned int"` to `config/i386gas.h`, so a gcc 2.0 bootstrapped from this `gccsrc*.flp` no longer warns; one bootstrapped from an older set still does.
+- The 0.95 build prints many `conflicting types for built-in function` warnings (strlen, memcpy, memcmp): gcc 2.0's default `size_t` is `long unsigned int`, the kernel's is `unsigned int`; identical on i386, harmless. `mkgcc20.sh` adds `#define SIZE_TYPE "unsigned int"` to `config/i386gas.h`, so a gcc 2.0 bootstrapped from this `gccsrc*.flp` no longer warns; one bootstrapped from an older set still does. The stock 0.12 `/usr/include/string.h` also declares the `strlen` result and the `memcpy`/`memcmp` length as `int`, which conflicts with the built-ins too; `mkinstall.sh` changes those three to `size_t` when packing.
 - 0.95 no longer reads SWAP_DEV at offset 506 of the boot diskette; it needs swapon.
 
 ### Pitfalls
