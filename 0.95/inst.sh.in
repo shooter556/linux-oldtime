@@ -7,8 +7,8 @@ SWAP=/dev/hda1
 PART=/dev/hda2
 PN=2
 SWAP_CYL=16
-GCC_N=@GCC_N@
-TOOLS_N=@TOOLS_N@
+GCC_B=@GCC_B@
+TOOLS_B=@TOOLS_B@
 
 usage() {
   echo "usage: sh /tmp/inst part    -n|--dry-run|-a|--apply CYLINDERS HEADS SECTORS"
@@ -18,6 +18,18 @@ usage() {
   echo "           ShoeLace (bootlace) on $PART and WiniBoot (default partition $PN) on $HD"
   echo "  -n, --dry-run  print commands only;  -a, --apply  really run"
   exit 1
+}
+
+# The package is $2 bytes from 1K block $1 of drive B. What follows its compressed
+# stream (0xF6 fill, old data) must not reach compress, so the last 1..1024 bytes
+# are cut out of their block into /tmp/last: Q whole blocks, then R bytes of it.
+# (no pipe inside a function: bash 1.12 breaks stdout of the inner pipe)
+lastblk() {
+  let Q=$2-1
+  let Q=Q/1024
+  let R=$2-Q*1024
+  let K=$1+Q
+  run "dd if=$FD of=/tmp/last bs=1024 skip=$K count=1"
 }
 
 run() {
@@ -90,11 +102,13 @@ install)
   run "mkdir /mnt/mnt /mnt/tmp"
   run "cd /"
   run "tar cf - bin dev etc usr | (cd /mnt; tar xf -)"
-  run "dd if=$FD bs=1024 skip=8 count=$GCC_N | compress -d | (cd /mnt; tar xvf -)"
+  lastblk 8 $GCC_B
+  run "(dd if=$FD bs=1024 skip=8 count=$Q; dd if=/tmp/last bs=1 count=$R) | compress -d | (cd /mnt; tar xvf -)"
   if [ $DRY = 0 ]; then
     echo -n "put tools.flp into drive B, then press Enter "; read a
   fi
-  run "dd if=$FD bs=1024 count=$TOOLS_N | compress -d | (cd /mnt; tar xvf -)"
+  lastblk 0 $TOOLS_B
+  run "(dd if=$FD bs=1024 count=$Q; dd if=/tmp/last bs=1 count=$R) | compress -d | (cd /mnt; tar xvf -)"
   run "ln /mnt/usr/bin/gzip /mnt/usr/bin/gunzip"
   run "ln /mnt/usr/bin/gzip /mnt/usr/bin/zcat"
   # fileutils ln has no symlink support here, so hard links (same filesystem)

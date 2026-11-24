@@ -138,6 +138,7 @@ ShoeLace 的几点用法：
 - 包里所有文件的时间都在 1992-03-08 或更早，guest 的时钟要比这个晚，否则 make 每次都会全部重编。
 - 包解开时要 `cd /`：包里的路径以 `usr/src` 开头。
 - Minix 文件名最多 14 个字符，`mkbootroot.sh` 会检查。
+- 软盘上压缩包后面的内容不一定是 0：格式化出来的空白盘是 `0xF6`，旧盘还有旧数据。最后一个 1K 块写不满时，这些多余的字节会被 `compress -d` 当成压缩数据，报 `file token bad`，补零也会多解出一截 NUL，tar 报 `EOF not on block boundary`，`install` 就 FAILED（文件其实都解出来了）。所以 `gccpkg` 把两个压缩包的精确字节数（`ls -l`）填进 `inst.sh.in`，`install` 按字节数读，不依赖盘的填充。
 - 0.12 没有 rename 系统调用，mv 不能移动目录：要替换包里的某个目录，从源码盘单独解出来，再 `rm -rf` 旧的。
 
 硬盘安装时：
@@ -285,6 +286,7 @@ The build environment on the 0.12 hard disk was not what it looked like; all of 
 - Every file in the package is dated 1992-03-08 or earlier; the guest clock must be later, or make rebuilds everything each run.
 - Unpack with `cd /`: package paths start with `usr/src`.
 - Minix file names are at most 14 characters; `mkbootroot.sh` checks this.
+- What follows the compressed package on a floppy is not necessarily 0: a formatted blank image is `0xF6`, an old floppy still has old data. When the last 1K block is only partly written, `compress -d` reads those extra bytes as compressed data and says `file token bad`; zero padding decodes to extra NULs instead and tar says `EOF not on block boundary`, so `install` FAILs (all files were in fact extracted). `gccpkg` therefore puts the exact byte size of both packages (from `ls -l`) into `inst.sh.in` and `install` reads exactly that many bytes, whatever the floppy is filled with.
 - 0.12 has no rename syscall, so mv cannot move directories: to replace a directory from the package, extract it alone from the source floppy, then `rm -rf` the old one.
 
 During the hard disk install:

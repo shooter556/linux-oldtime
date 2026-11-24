@@ -95,6 +95,7 @@ root)
 gccpkg)
   # blocks of a file: dd conv=sync pads the last block, so "N+0 records out" counts it
   nblk() { dd if=$1 of=/dev/null bs=1024 conv=sync 2>&1 | sed -n 's/+.* records out$//p'; }
+  bsize() { set -- `ls -l $1`; echo $5; }
   T=/tmp/gp
   [ -d $T ] && run "rm -rf $T"
   run "mkdir $T"
@@ -117,12 +118,17 @@ gccpkg)
   run "rm -rf $T"
   if [ $DRY = 0 ]; then
     GN=`nblk /tmp/gcc.Z`; TN=`nblk /tmp/tools.Z`
+    GB=`bsize /tmp/gcc.Z`; TB=`bsize /tmp/tools.Z`
+    let GC=(GB+1023)/1024
+    let TC=(TB+1023)/1024
+    [ $GC = $GN ] && [ $TC = $TN ] || { echo "bad ls -l size: gcc $GB, tools $TB bytes"; exit 1; }
     let GE=GN+8
     [ $GE -le 1440 ] && [ $TN -le 1440 ] || { echo "too big: gcc $GN, tools $TN blocks"; exit 1; }
   else
     GN="<blocks of /tmp/gcc.Z>"; TN="<blocks of /tmp/tools.Z>"
+    GB="<bytes of /tmp/gcc.Z>"; TB="<bytes of /tmp/tools.Z>"
   fi
-  run "sed -e 's/@GCC_N@/$GN/; s/@TOOLS_N@/$TN/' $D/inst.sh.in > /tmp/inst"
+  run "sed -e 's/@GCC_B@/$GB/; s/@TOOLS_B@/$TB/' $D/inst.sh.in > /tmp/inst"
   # gcc.flp: installer in blocks 0-7, gcc.Z from block 8
   if [ $DRY = 0 ]; then
     IN=`nblk /tmp/inst`
