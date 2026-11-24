@@ -62,7 +62,7 @@ RELNOTES 原版 root 盘上没有 vi、df、dd、tar、compress，这里为了�
 guest 里（已装好的 0.12 + gcc 2.0，B = br095.flp）：
 
 ```
-dd if=/dev/fd1 of=/tmp/br bs=1024 count=6
+dd if=/dev/fd1 of=/tmp/br bs=1024 count=7
 sh /tmp/br unpack --apply     # 解到 /usr/src/linux 和 /usr/src/0.95（已存在则拒绝）
 sh /tmp/br build --apply      # make root 盘程序，再 make 0.95 内核
                               # B 换成 boot.flp
@@ -89,7 +89,7 @@ root 盘的 `/dev`（0.95 新编号）：`PS0 PS1 at0 at1`、`hda hda1–8`（3,
 0.12 里（B = br095.flp，源码已 unpack、build）：
 
 ```
-dd if=/dev/fd1 of=/tmp/br bs=1024 count=6
+dd if=/dev/fd1 of=/tmp/br bs=1024 count=7
 sh /tmp/br gccpkg --apply     # 提示时 B 换成空白的 gcc.flp，再换成 tools.flp
 ```
 
@@ -210,7 +210,7 @@ Also prepare two blank 1.44M images: `boot.flp` and `root.flp`.
 In the guest (installed 0.12 + gcc 2.0, B = br095.flp):
 
 ```
-dd if=/dev/fd1 of=/tmp/br bs=1024 count=6
+dd if=/dev/fd1 of=/tmp/br bs=1024 count=7
 sh /tmp/br unpack --apply     # unpack into /usr/src/linux and /usr/src/0.95 (refuses if they exist)
 sh /tmp/br build --apply      # make the root diskette programs, then the 0.95 kernel
                               # B = boot.flp
@@ -237,7 +237,7 @@ Compressed, everything is about 1.7M, so it takes two floppies:
 On 0.12 (B = br095.flp, sources unpacked and built):
 
 ```
-dd if=/dev/fd1 of=/tmp/br bs=1024 count=6
+dd if=/dev/fd1 of=/tmp/br bs=1024 count=7
 sh /tmp/br gccpkg --apply     # when asked, B = blank gcc.flp, then tools.flp
 ```
 

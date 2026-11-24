@@ -317,7 +317,7 @@ tar --format=v7 --owner=0 --group=0 -cf "$W/pkg.tar" -C "$W" usr
 compress -c "$W/pkg.tar" > "$W/pkg.tar.Z"
 
 blocks() { echo $(( ($(stat -c%s "$1") + 1023) / 1024 )); }
-SCRIPT_N=6
+SCRIPT_N=7
 PKG_O=$SCRIPT_N PKG_N=$(blocks "$W/pkg.tar.Z")
 [ $((PKG_O + PKG_N)) -le 1440 ] || { echo "[ERROR] needs $((PKG_O + PKG_N)) blocks > 1440" >&2; exit 1; }
 
