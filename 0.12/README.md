@@ -33,6 +33,7 @@
 - 一个 `.Z` 软件包，已按最终路径摆好：
   - `bin/{umount,mknod,sync}`：sync 是主机上手工拼的最小 a.out，只做 `sync`、`exit(0)` 两次系统调用（同 V6 的 `s2/sync.s`）
   - root 盘上没有的程序：make、egrep、kermit、em、dir、vdir、expand、unexpand、split、tac、as86、ld86
+  - `usr/src/uname.c`：oldlinux-files 的 `bin/uname.c`（Jeff Comstock，1992），装好后由 kinst 编译
   - gcc 1.40：`/usr/local/bin/gcc` 和 `/usr/local/lib/gcc-*`、crt0.o、libc.a、gnulib
   - `/usr/include`
   - ShoeLace（`bin-src/shoelace.tar.Z`，1992-01-17 的 Linux 版）：`/shoelace`、`/etc/{laceup,bootlace,winiboot,disktab}`，另有生成的 `/etc/config`（`boot /Image`）
@@ -87,10 +88,12 @@ sh /tmp/inst install --apply            # mkswap hd1、mkfs hd2、拷 root 盘�
 
 ```
 dd if=/dev/fd1 of=/tmp/kinst bs=1024 count=2
-sh /tmp/kinst --apply                   # gas/gld/gar/cpp 硬链接、解源码、用 gcc 编 /bin/sync 测试 gcc
+sh /tmp/kinst --apply                   # gas/gld/gar/cpp 硬链接、解源码、用 gcc 编 /bin/sync 测试 gcc，再编 /usr/bin/uname
 cd /usr/src/linux; make
 dd bs=8192 if=Image of=/dev/fd1         # B 换一张空白盘
 ```
+
+`uname -a` 在 0.12 内核上显示 `Linux (none) 0 0.12 i386`，可以用来确认内核。但原版 0.95 的 `include/linux/config.h` 里 `UTS_VERSION` 仍是 `"0.12"`，所以在这里编的 0.95 内核上也显示 0.12，分不出这两个版本；而 0.10、0.11 内核返回的是写死的占位串。内核源码保持原样，没有为此修改。
 
 `mkinstall.sh` 打包时用 `tar --sort=name`：按目录读出的顺序打包，compress 后的大小每次会差到约 20 块，`install.flp` 有时放不下。
 
@@ -183,6 +186,7 @@ Both floppies are **raw** (no filesystem). The stock 0.12 root diskette has no m
 - one `.Z` package laid out at its final paths:
   - `bin/{umount,mknod,sync}`: sync is a minimal a.out built on the host that only makes the `sync` and `exit(0)` system calls (like V6 `s2/sync.s`)
   - programs missing from the root diskette: make, egrep, kermit, em, dir, vdir, expand, unexpand, split, tac, as86, ld86
+  - `usr/src/uname.c`: `bin/uname.c` from oldlinux-files (Jeff Comstock, 1992), compiled by kinst after the install
   - gcc 1.40: `/usr/local/bin/gcc` and `/usr/local/lib/gcc-*`, crt0.o, libc.a, gnulib
   - `/usr/include`
   - ShoeLace (`bin-src/shoelace.tar.Z`, the Linux build of 1992-01-17): `/shoelace`, `/etc/{laceup,bootlace,winiboot,disktab}`, plus a generated `/etc/config` (`boot /Image`)
@@ -237,10 +241,12 @@ Rebuilding the kernel (booted from the hard disk, B = kernel.flp):
 
 ```
 dd if=/dev/fd1 of=/tmp/kinst bs=1024 count=2
-sh /tmp/kinst --apply                   # hard-link gas/gld/gar/cpp, unpack the source, build /bin/sync to test gcc
+sh /tmp/kinst --apply                   # hard-link gas/gld/gar/cpp, unpack the source, build /bin/sync to test gcc, then /usr/bin/uname
 cd /usr/src/linux; make
 dd bs=8192 if=Image of=/dev/fd1         # with a blank floppy in B
 ```
+
+On the 0.12 kernel `uname -a` prints `Linux (none) 0 0.12 i386`, which confirms the kernel. The stock 0.95 `include/linux/config.h` still has `UTS_VERSION` `"0.12"`, though, so a 0.95 kernel built here prints 0.12 as well and the two cannot be told apart; the 0.10 and 0.11 kernels return hard-coded placeholder strings. The kernel source is left stock; it is not patched for this.
 
 `mkinstall.sh` packs with `tar --sort=name`: in readdir order the compressed size varied by up to about 20 blocks from run to run, and `install.flp` sometimes did not fit.
 

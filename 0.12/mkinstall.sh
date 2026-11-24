@@ -116,6 +116,8 @@ sed -i -e 's/^extern inline int strlen(/extern inline size_t strlen(/' \
     "$W/all/usr/include/string.h"
 [ "$(grep -c -E '^extern inline size_t strlen\(|memcpy\(.*size_t n\)|memcmp\(.*size_t count\)' "$W/all/usr/include/string.h")" = 3 ] || { echo "[ERROR] string.h prototypes not patched" >&2; exit 1; }
 tar xf "$SRC/kernel/0.1x/linux-0.12.tar" -C "$W/all/usr/include" --strip-components=2 linux-0.12/include/utime.h
+mkdir -p "$W/all/usr/src"
+cp "$SRC/bin/uname.c" "$W/all/usr/src/uname.c"
 # --sort=name: readdir order changes the compressed size by up to ~20 blocks from run to run
 tar --format=v7 --owner=0 --group=0 --sort=name -cf "$W/all.tar" -C "$W/all" bin etc shoelace usr
 

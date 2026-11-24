@@ -6,7 +6,8 @@ SRC=/usr/src/linux
 usage() {
   echo "usage: sh /tmp/kinst -n|--dry-run|-a|--apply"
   echo "  link gas/gld/gar/cpp to gcc-*, unpack stock source into $SRC,"
-  echo "  build /bin/sync from /usr/src/sync.c as a gcc test"
+  echo "  build /bin/sync from /usr/src/sync.c as a gcc test, /usr/bin/uname from"
+  echo "  /usr/src/uname.c (put there by install.flp)"
   echo "  -n, --dry-run  print commands only;  -a, --apply  really run"
   exit 1
 }
@@ -32,6 +33,7 @@ done
 run "dd if=$FD bs=1024 skip=@PKG_O@ count=@PKG_N@ | compress -d | (cd /; tar xvf -)"
 run "gcc -o /bin/sync /usr/src/sync.c"
 run "/bin/sync"
+run "gcc -o /usr/bin/uname /usr/src/uname.c"
 echo "next:"
 echo "  edit ROOT_DEV, SWAP_DEV, keyboard as mkkernel.sh printed (em or sed)"
 echo "  cd $SRC; make"
