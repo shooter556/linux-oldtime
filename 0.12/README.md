@@ -92,6 +92,8 @@ cd /usr/src/linux; make
 dd bs=8192 if=Image of=/dev/fd1         # B 换一张空白盘
 ```
 
+`mkinstall.sh` 打包时用 `tar --sort=name`：按目录读出的顺序打包，compress 后的大小每次会差到约 20 块，`install.flp` 有时放不下。
+
 ### 自举 gcc 2.0，再编译 0.95 内核
 
 在装好的 0.12 上用 gcc 1.40 三阶段自举官方 gcc-2.0（1992-02-22），再用它编译原版 0.95 内核，0.95 内核能正常启动。VM：i386SX + **387**、4MB 内存、hd1 上约 8MB swap。
@@ -239,6 +241,8 @@ sh /tmp/kinst --apply                   # hard-link gas/gld/gar/cpp, unpack the 
 cd /usr/src/linux; make
 dd bs=8192 if=Image of=/dev/fd1         # with a blank floppy in B
 ```
+
+`mkinstall.sh` packs with `tar --sort=name`: in readdir order the compressed size varied by up to about 20 blocks from run to run, and `install.flp` sometimes did not fit.
 
 ### Bootstrapping gcc 2.0, then building the 0.95 kernel
 
