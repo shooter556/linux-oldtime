@@ -13,6 +13,7 @@ usage() {
     echo "                       surviving linux-0.10.tar.gz (a Ted Ts'o working tree)"
     echo "  usr/src/update-0.10  the original 0.10 /bin/update"
     echo "  usr/bin/cut, tr      0.12 binaries, needed by the 0.10 Makefile"
+    echo "  usr/src/uname.c      Jeff Comstock's uname (bin/uname.c, 1992)"
     echo "Sources: an oldlinux-files tree."
     echo
     echo "  -s, --source DIR   oldlinux-files tree (default: \$OLDLINUX)"
@@ -134,6 +135,7 @@ gzip -dc "$SRC/Linux-0.12/binaries/usr.bin/fileutil.tar.Z" | tar xf - -C "$W/x" 
 mv "$W/x/usr/bin/cut" "$W/usr/bin/cut"
 gzip -dc "$SRC/Linux-0.12/binaries/usr.bin/tr.Z" > "$W/usr/bin/tr"
 chmod 755 "$W/usr/bin/cut" "$W/usr/bin/tr" "$W/usr/src/update-0.10"
+cp "$SRC/bin/uname.c" "$W/usr/src/uname.c"
 
 tar --format=v7 --owner=0 --group=0 -cf "$W/pkg.tar" -C "$W" usr
 compress -c "$W/pkg.tar" > "$W/pkg.tar.Z"

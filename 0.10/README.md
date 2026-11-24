@@ -66,7 +66,7 @@
 
 ```
 dd if=/dev/fd1 of=/tmp/kinst bs=1024 count=4
-sh /tmp/kinst src -a            # 解源码、update、cut、tr
+sh /tmp/kinst src -a            # 解源码、update、cut、tr，编 uname
 cd /usr/src/linux-0.10; make
 sh /tmp/kinst boot -a           # B 换空白盘：写 Image
 sh /tmp/kinst root -a           # B 换空白盘：mkfs，放最小 root
@@ -74,7 +74,9 @@ sh /tmp/kinst root -a           # B 换空白盘：mkfs，放最小 root
 
 每个子命令都可以先用 `-n` 只打印命令。
 
-root 盘只放最小的一套：`/bin` 下有 sh、update、mkfs、mount、umount、mknod、fdisk；`/usr/bin` 下有 ls、cp、mv、mvdir、rm、rmdir、mkdir、cat、dd、chmod、sync；`/etc` 下有 profile、passwd、group、空的 mtab；设备节点 hd0–8、fd0/fd1、tty、tty0–3、null。程序都从 0.11 系统里拷，它们用到的系统调用 0.10 都有（0.10 只比 0.11 少 70、71 号 setreuid/setregid）。
+root 盘只放最小的一套：`/bin` 下有 sh、update、mkfs、mount、umount、mknod、fdisk；`/usr/bin` 下有 ls、cp、mv、mvdir、rm、rmdir、mkdir、cat、dd、chmod、sync、uname；`/etc` 下有 profile、passwd、group、空的 mtab；设备节点 hd0–8、fd0/fd1、tty、tty0–3、null。程序都从 0.11 系统里拷，它们用到的系统调用 0.10 都有（0.10 只比 0.11 少 70、71 号 setreuid/setregid）。
+
+uname 是 oldlinux-files 里的 `bin/uname.c`（Jeff Comstock，1992），`kinst src` 在 0.11 上用 gcc 1.40 编成 `/usr/src/uname-0.10`，`kinst root` 把它放进 root 盘的 `/usr/bin`，装硬盘时随 `cp /usr/bin/*` 一起拷过去。注意 0.10 内核的 `sys_uname` 返回的是写死的占位串，`uname -a` 显示 `linux .0 nodename release  version  machine `，和 0.11 完全一样，所以只能看出是 0.10/0.11 这一代，分不出具体版本。内核源码保持原样，没有为此修改。
 
 启动：A 放 boot 盘，出现 `Insert root floppy and press ENTER` 后换 root 盘。boot 盘第 508 字节的 ROOT_DEV 是 0，意思是 root 和启动用的是同一种软盘。
 
@@ -235,7 +237,7 @@ On the 0.11 hard-disk system, with `kernel.flp` in drive B:
 
 ```
 dd if=/dev/fd1 of=/tmp/kinst bs=1024 count=4
-sh /tmp/kinst src -a            # unpack the source, update, cut, tr
+sh /tmp/kinst src -a            # unpack the source, update, cut, tr; build uname
 cd /usr/src/linux-0.10; make
 sh /tmp/kinst boot -a           # B = blank floppy: write Image
 sh /tmp/kinst root -a           # B = blank floppy: mkfs, minimal root
@@ -243,7 +245,9 @@ sh /tmp/kinst root -a           # B = blank floppy: mkfs, minimal root
 
 Every sub-command accepts `-n` to print the commands without running them.
 
-The root diskette holds a minimal set: sh, update, mkfs, mount, umount, mknod and fdisk in `/bin`; ls, cp, mv, mvdir, rm, rmdir, mkdir, cat, dd, chmod and sync in `/usr/bin`; profile, passwd, group and an empty mtab in `/etc`; device nodes hd0–8, fd0/fd1, tty, tty0–3 and null. The programs are copied from the 0.11 system; 0.10 has every syscall they use (it lacks only 0.11's 70 and 71, setreuid/setregid).
+The root diskette holds a minimal set: sh, update, mkfs, mount, umount, mknod and fdisk in `/bin`; ls, cp, mv, mvdir, rm, rmdir, mkdir, cat, dd, chmod, sync and uname in `/usr/bin`; profile, passwd, group and an empty mtab in `/etc`; device nodes hd0–8, fd0/fd1, tty, tty0–3 and null. The programs are copied from the 0.11 system; 0.10 has every syscall they use (it lacks only 0.11's 70 and 71, setreuid/setregid).
+
+uname is `bin/uname.c` from oldlinux-files (Jeff Comstock, 1992). `kinst src` builds it on 0.11 with gcc 1.40 as `/usr/src/uname-0.10`, `kinst root` puts it in `/usr/bin` of the root diskette, and `cp /usr/bin/*` carries it to the hard disk. Note that the 0.10 kernel's `sys_uname` returns hard-coded placeholder strings: `uname -a` prints `linux .0 nodename release  version  machine `, exactly as on 0.11, so it only tells the 0.10/0.11 generation, not the exact version. The kernel source is left stock; it is not patched for this.
 
 Boot: boot diskette in A; at `Insert root floppy and press ENTER` swap in the root diskette. ROOT_DEV at offset 508 of the boot diskette is 0, meaning the same kind of floppy as the one booted from.
 

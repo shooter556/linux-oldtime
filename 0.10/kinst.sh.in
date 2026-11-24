@@ -4,10 +4,12 @@
 FD=/dev/fd1
 SRC=/usr/src/linux-0.10
 UPD=/usr/src/update-0.10
+UNAME=/usr/src/uname-0.10
 
 usage() {
   echo "usage: sh /tmp/kinst src|boot|root -n|--dry-run|-a|--apply"
-  echo "  src   kernel.flp in B: unpack $SRC, $UPD, /usr/bin/cut, tr"
+  echo "  src   kernel.flp in B: unpack $SRC, $UPD, /usr/bin/cut, tr;"
+  echo "        build $UNAME from /usr/src/uname.c"
   echo "        then: cd $SRC; make"
   echo "  boot  blank floppy in B: write $SRC/Image to it"
   echo "  root  blank floppy in B: mkfs, fill with a minimal 0.10 root"
@@ -31,6 +33,7 @@ case "$1" in
 src)
   [ -d $SRC ] && { echo "$SRC already exists, remove it first"; exit 1; }
   run "dd if=$FD bs=1024 skip=@PKG_O@ count=@PKG_N@ | compress -d | (cd /; tar xvf -)"
+  run "gcc -o $UNAME /usr/src/uname.c"
   run "sync"
   echo "next: cd $SRC; make"
   ;;
@@ -41,7 +44,7 @@ boot)
   echo "boot floppy done"
   ;;
 root)
-  [ -f $UPD ] || { echo "$UPD missing, run src first"; exit 1; }
+  for f in $UPD $UNAME; do [ -f $f ] || { echo "$f missing, run src first"; exit 1; }; done
   run "mkfs $FD 1440"
   run "mount $FD /mnt"
   for d in bin dev etc usr usr/bin usr/root mnt tmp; do
@@ -51,6 +54,7 @@ root)
     run "cp $f /mnt$f"
   done
   run "cp $UPD /mnt/bin/update"
+  run "cp $UNAME /mnt/usr/bin/uname"
   for f in ls cp mv mvdir rm rmdir mkdir cat dd chmod sync; do
     run "cp /usr/bin/$f /mnt/usr/bin/$f"
   done
