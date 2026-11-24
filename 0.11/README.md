@@ -140,10 +140,12 @@ sh /tmp/fuinst fixroot --apply  # B 换 root 盘（或它的副本）
 
 ```
 dd if=/dev/fd1 of=/tmp/kinst bs=1024 count=2
-sh /tmp/kinst --apply           # 用 dd 把 gcc-* 复制成 gas/gld/gar/cpp，解源码
+sh /tmp/kinst --apply           # 用 dd 把 gcc-* 复制成 gas/gld/gar/cpp，解源码，编 /usr/bin/uname
 cd /usr/src/linux-0.11; make
 dd bs=8192 if=Image of=/dev/fd1 # B 换一张空白盘
 ```
+
+kernel.flp 上还带了 oldlinux-files 的 `bin/uname.c`（Jeff Comstock，1992），kinst 用 0.11 的 gcc 把它编成 `/usr/bin/uname`。注意 0.11 内核的 `sys_uname` 返回的是写死的占位串，`uname -a` 显示 `linux .0 nodename release  version  machine `，和 0.10 完全一样，所以只能看出是 0.10/0.11 这一代，分不出具体版本。内核源码保持原样，没有为此修改。
 
 每个子命令都可以先用 `--dry-run` 只打印命令。
 
@@ -302,10 +304,12 @@ Rebuild the kernel (B = kernel.flp):
 
 ```
 dd if=/dev/fd1 of=/tmp/kinst bs=1024 count=2
-sh /tmp/kinst --apply           # copy gcc-* to gas/gld/gar/cpp with dd, unpack the source
+sh /tmp/kinst --apply           # copy gcc-* to gas/gld/gar/cpp with dd, unpack the source, build /usr/bin/uname
 cd /usr/src/linux-0.11; make
 dd bs=8192 if=Image of=/dev/fd1 # with a blank floppy in B
 ```
+
+kernel.flp also carries `bin/uname.c` from oldlinux-files (Jeff Comstock, 1992); kinst builds it with 0.11's gcc as `/usr/bin/uname`. Note that the 0.11 kernel's `sys_uname` returns hard-coded placeholder strings: `uname -a` prints `linux .0 nodename release  version  machine `, exactly as on 0.10, so it only tells the 0.10/0.11 generation, not the exact version. The kernel source is left stock; it is not patched for this.
 
 Every sub-command accepts `--dry-run` to print the commands without running them.
 

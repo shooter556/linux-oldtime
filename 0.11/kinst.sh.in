@@ -6,7 +6,8 @@ SRC=/usr/src/linux-0.11
 
 usage() {
   echo "usage: sh /tmp/kinst -n|--dry-run|-a|--apply"
-  echo "  copy gcc-* to gas/gld/gar/cpp, unpack $SRC (ROOT_DEV=/dev/hd1, KBD_US)"
+  echo "  copy gcc-* to gas/gld/gar/cpp, unpack $SRC (ROOT_DEV=/dev/hd1, KBD_US),"
+  echo "  build /usr/bin/uname from /usr/src/uname.c"
   echo "  -n, --dry-run  print commands only;  -a, --apply  really run"
   exit 1
 }
@@ -30,6 +31,7 @@ esac
 [ -d /usr/src ] || run "mkdir /usr/src"
 [ -d $SRC ] && { echo "$SRC already exists, remove it first"; exit 1; }
 run "dd if=$FD bs=1024 skip=@PKG_O@ count=@PKG_N@ | compress -d | (cd /; tar xvf -)"
+run "gcc -o /usr/bin/uname /usr/src/uname.c"
 run "sync"
 echo "next:"
 echo "  cd $SRC; make"

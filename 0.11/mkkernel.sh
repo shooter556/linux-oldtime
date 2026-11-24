@@ -9,7 +9,8 @@ usage() {
     echo
     echo "Build a 1.44M raw floppy with the guest script /tmp/kinst (from kinst.sh.in)"
     echo "and a compressed tar of usr/src/linux-0.11 (Makefile: ROOT_DEV=/dev/hd1,"
-    echo "include/linux/config.h: KBD_US). Sources: an oldlinux-files tree."
+    echo "include/linux/config.h: KBD_US) and usr/src/uname.c (bin/uname.c, 1992)."
+    echo "Sources: an oldlinux-files tree."
     echo
     echo "  -s, --source DIR   oldlinux-files tree (default: \$OLDLINUX)"
     echo "                     https://github.com/oldlinux-web/oldlinux-files"
@@ -46,6 +47,7 @@ grep -q '^ROOT_DEV=/dev/hd1$' "$MK" && grep -q '^	\./tools/build boot/bootsect' 
 CF=$W/usr/src/linux-0.11/include/linux/config.h
 sed -i -e 's|^/\*#define KBD_US \*/$|#define KBD_US|' -e 's|^#define KBD_FINNISH$|/*#define KBD_FINNISH */|' "$CF"
 grep -q '^#define KBD_US$' "$CF" && ! grep -q '^#define KBD_FINNISH' "$CF" || { echo "[ERROR] config.h patch failed" >&2; exit 1; }
+cp "$SRC/bin/uname.c" "$W/usr/src/uname.c"
 tar --format=v7 --owner=0 --group=0 -cf "$W/pkg.tar" -C "$W" usr
 compress -c "$W/pkg.tar" > "$W/pkg.tar.Z"
 
