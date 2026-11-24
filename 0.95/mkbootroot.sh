@@ -20,6 +20,7 @@ usage() {
     echo "  mount.c umount.c  Linux-0.12/sources/sbin, lock file opened O_WRONLY"
     echo "  swapsrc/        Linux-0.12/sources/sbin/swapon.tar.Z, __NR_swapon 87"
     echo "  update.c        system-0.98.tar.Z;  sync.c  main() { sync(); }"
+    echo "  uname.c         bin/uname.c (Jeff Comstock, 1992)"
     echo "  fileutils-3.1/  GNU fileutils 3.1 + Makefile.l095 (only the root diskette programs)"
     echo "  gzip-1.1.1/     gzip 1.1.1 source (./gzip-1.1.1) + Makefile.l095 (gzip.mk); for tools.flp"
     echo "  include/        string.h of the 0.95 kernel (include-0.12's fails with gcc 2.0 -O)"
@@ -81,6 +82,7 @@ gzip -dc "$SRC/bin-src/system-0.98.tar.Z" | tar xf - -C "$W/x" system-0.98/updat
 cp "$W/x/system-0.98/update.c" "$D/update.c"
 printf 'main()\n{\n\tsync();\n\treturn 0;\n}\n' > "$D/sync.c"
 touch -d '1992-03-08 12:00' "$D/sync.c"
+cp "$SRC/bin/uname.c" "$D/uname.c"
 gzip -dc "$SRC/Linux-0.12/sources/usr.bin/fileutils-3.1.tar.Z" | tar xf - -C "$D"
 gzip -dc "$SRC/Linux-0.12/binaries/compilers/bison.tar.Z" | tar xf - -C "$W/x"
 B=$(dirname "$(find "$W/x" -type f -name bison)")

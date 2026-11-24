@@ -12,7 +12,7 @@ LDFLAGS = -L/usr/src/0.95/lib -Xlinker -s
 B = /usr/src/0.95/bison
 
 PROGS = poe-IGL/init poe-IGL/agetty poe-IGL/login \
-	system/mkfs system/mkswap system/mknod fdisk df mount umount swapon sync update
+	system/mkfs system/mkswap system/mknod fdisk df mount umount swapon sync update uname
 
 all: $(PROGS) fileutils gzip
 
@@ -65,6 +65,9 @@ sync: sync.c
 
 update: update.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o update update.c
+
+uname: uname.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o uname uname.c
 
 fileutils:
 	cd fileutils-3.1; BISON_SIMPLE=$(B)/bison.simple BISON_HAIRY=$(B)/bison.hairy \

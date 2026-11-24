@@ -31,7 +31,7 @@ case "$2" in
 esac
 
 BIN="poe-IGL/init poe-IGL/agetty poe-IGL/login system/mkfs system/mkswap system/mknod"
-BIN="$BIN fdisk df mount umount swapon sync"
+BIN="$BIN fdisk df mount umount swapon sync uname"
 FU="ls cp mv rm ln mkdir rmdir chmod chown chgrp touch dd"
 XBIN="bin/vi bin/tar bin/compress"
 GCC="usr/local/bin/gcc usr/local/lib/gcc usr/local/lib/crt0.o usr/include usr/bin/make"

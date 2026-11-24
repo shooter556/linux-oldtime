@@ -44,12 +44,15 @@ root 盘上的程序和来源：
 | mount、umount | `Linux-0.12/sources/sbin/mount.c.Z`、`umount.c.Z` |
 | swapon | `Linux-0.12/sources/sbin/swapon.tar.Z` |
 | sync | 手写的 `main() { sync(); }` |
+| uname | `bin/uname.c`（Jeff Comstock，1992） |
 | /etc/update | `bin-src/system-0.98.tar.Z` 的 `update.c`（没有更早的源码） |
 | ls cp mv rm ln mkdir rmdir chmod chown chgrp touch dd | `Linux-0.12/sources/usr.bin/fileutils-3.1.tar.Z`，bison 1.14 二进制处理 `.y` |
 | vi | `Linux-0.12/binaries/usr.bin/vi.Z`（elvis 1.4 二进制） |
 | tar、compress | `images/rootimage-0.11-20040305` 里的二进制（本地 tar-1.10 源码包是截断的，1.11.1 又太晚） |
 
 RELNOTES 原版 root 盘上没有 vi、df、dd、tar、compress，这里为了装硬盘加上了。三个二进制在主机上去掉了符号表。
+
+uname 是为了确认运行中的内核而加的，但原版 0.95 的 `include/linux/config.h` 里 `UTS_VERSION` 仍是 `"0.12"`，所以 `uname -a` 显示 `Linux (none) 0 0.12 i386`，和 0.12 内核一样，分不出这两个版本。内核源码保持原样，没有为此修改。
 
 ### 使用
 
@@ -192,12 +195,15 @@ Root diskette programs and their sources:
 | mount, umount | `Linux-0.12/sources/sbin/mount.c.Z`, `umount.c.Z` |
 | swapon | `Linux-0.12/sources/sbin/swapon.tar.Z` |
 | sync | a hand-written `main() { sync(); }` |
+| uname | `bin/uname.c` (Jeff Comstock, 1992) |
 | /etc/update | `update.c` from `bin-src/system-0.98.tar.Z` (no older source exists) |
 | ls cp mv rm ln mkdir rmdir chmod chown chgrp touch dd | `Linux-0.12/sources/usr.bin/fileutils-3.1.tar.Z`, `.y` files via the bison 1.14 binary |
 | vi | `Linux-0.12/binaries/usr.bin/vi.Z` (elvis 1.4 binary) |
 | tar, compress | binaries from `images/rootimage-0.11-20040305` (the local tar-1.10 source archive is truncated, and 1.11.1 is too late) |
 
 The original RELNOTES root diskette had no vi, df, dd, tar or compress; they are added here for the hard disk install. The three binaries have their symbol tables stripped on the host.
+
+uname is added to confirm the running kernel, but the stock 0.95 `include/linux/config.h` still has `UTS_VERSION` `"0.12"`, so `uname -a` prints `Linux (none) 0 0.12 i386`, the same as a 0.12 kernel, and the two cannot be told apart. The kernel source is left stock; it is not patched for this.
 
 ### Usage
 
