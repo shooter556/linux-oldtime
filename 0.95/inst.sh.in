@@ -32,6 +32,12 @@ lastblk() {
   run "dd if=$FD of=/tmp/last bs=1024 skip=$K count=1"
 }
 
+# a leftover mount from a failed earlier run is fine, "not mounted" is too
+try() {
+  echo "+ $* (error ignored)"
+  if [ $DRY = 0 ]; then eval "$*"; fi
+}
+
 run() {
   echo "+ $*"
   if [ $DRY = 0 ]; then eval "$*" || { echo "FAILED: $*"; exit 1; }; fi
@@ -95,8 +101,14 @@ install)
     SBLOCKS="<blocks of $SWAP>"
     BLOCKS="<blocks of $PART>"
   fi
-  run "mkswap $SWAP $SBLOCKS"
-  run "swapon $SWAP"
+  if [ -f /tmp/swapon.done ]; then
+    echo "$SWAP is already swap (earlier run), skip mkswap+swapon"
+  else
+    run "mkswap $SWAP $SBLOCKS"
+    run "swapon $SWAP"
+    run ": > /tmp/swapon.done"
+  fi
+  try "umount $PART"
   run "mkfs $PART $BLOCKS"
   run "mount $PART /mnt"
   run "mkdir /mnt/mnt /mnt/tmp"
