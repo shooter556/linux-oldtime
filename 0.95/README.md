@@ -105,7 +105,7 @@ dd if=/dev/PS1 of=/tmp/inst bs=1024 count=8
 sh /tmp/inst install --apply          # 中途提示时 B 换成 tools.flp
 ```
 
-`part` 用 fdisk 0.91 写分区表，已经是这样分的就跳过。`install` 做 mkswap、swapon、mkfs，把 root 盘的 `bin dev etc usr` 拷过去，解开两张盘，建 gunzip、zcat 到 `/usr/bin/gzip` 的硬链接，在 `/usr/local/bin` 建 as、ld、cpp 等的硬链接，写 `/etc/profile`（PATH 加 `/usr/local/bin`）、在 `/etc/rc` 开头加 `swapon /dev/hda1`，最后 `laceup /dev/hda2 wini`（bootlace 写进 hda2 的引导块）、`laceup -w 2 /dev/hda`（WiniBoot 写进 MBR，保留分区表，默认第 2 分区）。
+`part` 用 fdisk 0.91 写分区表，已经是这样分的就跳过。`install` 做 mkswap、swapon、mkfs，把 root 盘的 `bin dev etc usr` 拷过去，解开两张盘，建 gunzip、zcat 到 `/usr/bin/gzip` 的软链接，在 `/usr/local/bin` 建 as、ld、cpp 等的软链接（目标写装好后的路径，不带 `/mnt`），写 `/etc/profile`（PATH 加 `/usr/local/bin`）、在 `/etc/rc` 开头加 `swapon /dev/hda1`，最后 `laceup /dev/hda2 wini`（bootlace 写进 hda2 的引导块）、`laceup -w 2 /dev/hda`（WiniBoot 写进 MBR，保留分区表，默认第 2 分区）。
 
 完成后等 30 秒、关机、取出软盘再开机：
 
@@ -147,7 +147,7 @@ ShoeLace 的几点用法：
 硬盘安装时：
 
 - root 盘上没有 grep、sed，安装脚本只用 bash 自己的 `while read`、`case` 解析 fdisk 输出。
-- root 盘的 ln（fileutils 3.1 配 libc-0.12）不支持符号链接，自动改成硬链接，所以 `/usr/local/bin` 下的 as、ld、cpp 等都是在 `/mnt` 里建的硬链接。
+- include-0.12 的 `sys/stat.h` 没有 `S_IFLNK`，按它编出来的 ln 会把 `-s` 悄悄换成硬链接（只打印 `symbolic links not supported; making hard links`）。内核和 libc-0.12 都支持符号链接，所以编 fileutils 时加 `-DS_IFLNK=0120000`（0.12 内核的值），`lib/system.h` 由它推出 `S_ISLNK`，ln、ls、cp 等就都认符号链接了。
 - 安装脚本超过 4K，`dd count=4` 读到的是截断的脚本，bash 报 `Unexpected EOF`。现在留 8 块，`gccpkg` 会检查大小。
 - fdisk 0.91 写出的第 1 分区起始 CHS 不对（显示磁头 f、扇区 4），起始扇区和大小是对的，Linux 和 WiniBoot（只启动第 2 分区）都不受影响。它对 hda2 提示 `Linux cannot currently use 47361 sectors`，是拿扇区数和 65535 比，实际 56448 块没超 64M 的限制。
 - 主机上用 ncompress 压的 ShoeLace 包，0.95 上的 compress（和 0.12 硬盘上的是同一个二进制）解到一半就退出，原因没查清；同样由主机压缩的源码包在 0.12 上解压没问题。现在 ShoeLace 放在 gcc.flp 里，由 0.12 上的 compress 压缩。
@@ -256,7 +256,7 @@ dd if=/dev/PS1 of=/tmp/inst bs=1024 count=8
 sh /tmp/inst install --apply          # B = tools.flp when asked
 ```
 
-`part` writes the partition table with fdisk 0.91 and skips if it is already laid out that way. `install` runs mkswap, swapon and mkfs, copies `bin dev etc usr` of the root diskette, unpacks both floppies, hard-links gunzip and zcat to `/usr/bin/gzip`, makes hard links for as, ld, cpp and friends in `/usr/local/bin`, writes `/etc/profile` (PATH with `/usr/local/bin`), puts `swapon /dev/hda1` at the top of `/etc/rc`, and finally runs `laceup /dev/hda2 wini` (bootlace into hda2's boot block) and `laceup -w 2 /dev/hda` (WiniBoot into the MBR, keeping the partition table, default partition 2).
+`part` writes the partition table with fdisk 0.91 and skips if it is already laid out that way. `install` runs mkswap, swapon and mkfs, copies `bin dev etc usr` of the root diskette, unpacks both floppies, symlinks gunzip and zcat to `/usr/bin/gzip`, symlinks as, ld, cpp and friends in `/usr/local/bin` (targets are the installed paths, without `/mnt`), writes `/etc/profile` (PATH with `/usr/local/bin`), puts `swapon /dev/hda1` at the top of `/etc/rc`, and finally runs `laceup /dev/hda2 wini` (bootlace into hda2's boot block) and `laceup -w 2 /dev/hda` (WiniBoot into the MBR, keeping the partition table, default partition 2).
 
 Then wait 30 seconds, power off, remove the floppies and boot:
 
@@ -298,7 +298,7 @@ The build environment on the 0.12 hard disk was not what it looked like; all of 
 During the hard disk install:
 
 - The root diskette has no grep or sed; the installer parses fdisk output with bash's own `while read` and `case`.
-- The root diskette's ln (fileutils 3.1 with libc-0.12) has no symlink support and falls back to hard links, so as, ld, cpp and friends in `/usr/local/bin` are hard links made inside `/mnt`.
+- include-0.12's `sys/stat.h` has no `S_IFLNK`, and an ln built against it quietly turns `-s` into a hard link (it only prints `symbolic links not supported; making hard links`). The kernel and libc-0.12 both support symlinks, so fileutils is built with `-DS_IFLNK=0120000` (the 0.12 kernel value); `lib/system.h` derives `S_ISLNK` from it, and ln, ls, cp and the rest handle symlinks.
 - The installer grew past 4K; `dd count=4` read a truncated script and bash said `Unexpected EOF`. It now gets 8 blocks and `gccpkg` checks the size.
 - fdisk 0.91 wrote a wrong start CHS for partition 1 (head f, sector 4); its start sector and size are right, so neither Linux nor WiniBoot (which boots partition 2) cares. Its `Linux cannot currently use 47361 sectors` for hda2 compares sectors with 65535; the 56448 blocks are within the 64M limit.
 - A ShoeLace package compressed by ncompress on the host made the 0.95 compress (the same binary as on the 0.12 hard disk) stop halfway; the cause is unknown, while the host-compressed source package unpacks fine on 0.12. ShoeLace now goes on gcc.flp, compressed by compress on 0.12.

@@ -246,7 +246,9 @@ st_blocks (size)
 open(p, 'w').write(s)
 os.utime(p, (st.st_atime, st.st_mtime))
 
-defs = ('-DDIRENT -DST_BLOCKS_MISSING -DBSIZE=1024 -DSTDC_HEADERS -DPOSIX -DUSG '
+# include-0.12 sys/stat.h lacks S_IFLNK, so ln -s would fall back to hard links;
+# lib/system.h derives S_ISLNK from it (0.12 kernel value). libc-0.12 has symlink/lstat/readlink.
+defs = ('-DS_IFLNK=0120000 -DDIRENT -DST_BLOCKS_MISSING -DBSIZE=1024 -DSTDC_HEADERS -DPOSIX -DUSG '
         '-DFCHMOD_MISSING -DMKFIFO_MISSING -DFTRUNCATE_MISSING')
 libo = ('argmatch backupfile basename dirname eaccess error filemode getopt getopt1 '
         'getversion idcache isdir makepath modechange savedir stripslash xmalloc '

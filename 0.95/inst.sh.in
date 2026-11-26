@@ -121,14 +121,14 @@ install)
   fi
   lastblk 0 $TOOLS_B
   run "(dd if=$FD bs=1024 count=$Q; dd if=/tmp/last bs=1 count=$R) | compress -d | (cd /mnt; tar xvf -)"
-  run "ln /mnt/usr/bin/gzip /mnt/usr/bin/gunzip"
-  run "ln /mnt/usr/bin/gzip /mnt/usr/bin/zcat"
-  # fileutils ln has no symlink support here, so hard links (same filesystem)
+  # symlink targets are paths on the installed system, without /mnt
+  run "ln -s /usr/bin/gzip /mnt/usr/bin/gunzip"
+  run "ln -s /usr/bin/gzip /mnt/usr/bin/zcat"
   for p in as ld ar ranlib nm size strip; do
-    run "ln /mnt/usr/local/lib/gcc-$p /mnt/usr/local/bin/$p"
+    run "ln -s /usr/local/lib/gcc-$p /mnt/usr/local/bin/$p"
   done
-  run "ln /mnt/usr/local/lib/gcc-ar /mnt/usr/local/bin/gar"
-  run "ln /mnt/usr/local/lib/gcc/i386-gas-sysv/2.0/cpp /mnt/usr/local/bin/cpp"
+  run "ln -s /usr/local/lib/gcc-ar /mnt/usr/local/bin/gar"
+  run "ln -s /usr/local/lib/gcc/i386-gas-sysv/2.0/cpp /mnt/usr/local/bin/cpp"
   run "echo 'PATH=/usr/local/bin:/bin:/usr/bin:/etc; export PATH' > /mnt/etc/profile"
   run "(echo 'swapon $SWAP'; cat /etc/rc) > /mnt/etc/rc"
   # laceup finds bootlace, winiboot and disktab in the current directory
