@@ -130,7 +130,22 @@ cp /usr/src/gcc/tools/float.h.ieee /usr/local/lib/gcc/i386-gas-sysv/2.0/include/
 
 在 `/tmp` 编 `ftest.c`：`i=24`、`3->3`、`atof: 0`（libc 是软浮点，double 返回值放在 eax:edx，gcc 2.0 从 st(0) 取，所以是 0）；`hdr.c`：`hello 5 6 2147483647`、`FLT_DIG=6 DBL_DIG=15`。
 
-0.95 内核：源码用原版 0.95（`git archive` 后重新打成 v7 tar，compress 后 dd 到软盘），只改 `ROOT_DEV=/dev/hd2` 和 `keyboard.S` 的 `KBD_US`，不要打开 `-fcombine-regs`。
+0.95 内核：源码用原版 0.95，和 0.12 一样用 `mkkernel.sh` 做源码盘（`git archive` 后重新打成 v7 tar，compress 后 dd 到软盘），只改 `ROOT_DEV=/dev/hd2` 和 `keyboard.S` 的 `KBD_US`，不要打开 `-fcombine-regs`。
+
+```
+./mkkernel.sh -s /path/to/history -t 0.95 -o kernel095.flp
+```
+
+guest 里（B = kernel095.flp）。kinst 只解开源码，不编译内核；as 等链接已有就跳过，`/bin/sync`、`/usr/bin/uname` 会用 gcc 2.0 重编一遍：
+
+```
+mv /usr/src/linux /usr/src/linux-0.12   # kinst 不覆盖已有的 /usr/src/linux
+dd if=/dev/fd1 of=/tmp/kinst bs=1024 count=2
+sh /tmp/kinst --apply
+                                        # 按 mkkernel.sh 打印的位置，用 em 或 sed 改 ROOT_DEV 和 KBD_US
+cd /usr/src/linux; make
+dd bs=8192 if=Image of=/dev/fd1         # B 换一张空白盘
+```
 
 注意：
 
@@ -139,6 +154,7 @@ cp /usr/src/gcc/tools/float.h.ieee /usr/local/lib/gcc/i386-gas-sysv/2.0/include/
 - gcc 2.0 只提供驱动、cpp、cc1、libgcc.a 和头文件；as、ld、ar 等仍是 gccbin（1991）里的。
 - 0.95 内核里有大量 `conflicting types for built-in function` 警告（strlen、memcpy、memcmp）：gcc 2.0 默认的 `size_t` 是 `long unsigned int`，内核是 `unsigned int`，i386 上一样，可以忽略。`mkgcc20.sh` 在 `config/i386gas.h` 里加了 `#define SIZE_TYPE "unsigned int"`，用这版 `gccsrc*.flp` 自举出来的 gcc 2.0 不会再报；更早做的盘自举出来的仍会报。另外 0.12 自带的 `/usr/include/string.h` 把 `strlen` 的返回值、`memcpy`/`memcmp` 的长度都写成 `int`，同样和内建声明冲突，`mkinstall.sh` 打包时把这三处改成了 `size_t`。
 - 0.95 不再读 boot 盘偏移 506 的 SWAP_DEV，要用 swapon。
+- `make bootstrap` 每一阶段都会出现 `make: *** [enquire.o] Error 1 (ignored)`，可以忽略。规则里的 `-cp $(srcdir)/enquire.c . > /dev/null 2>&1` 是给另建目录编译用的；在源码目录里编时 `srcdir` 就是 `.`，cp 把文件拷给自己，返回 1，开头的 `-` 让 make 继续，接着照常编 enquire、生成 `float.h`。这个 `float.h` 不准（libc-0.12 的 printf/sscanf 处理极端浮点值有错），安装后用 `float.h.ieee` 替换。
 
 ### 遇到的坑
 
@@ -283,7 +299,22 @@ cp /usr/src/gcc/tools/float.h.ieee /usr/local/lib/gcc/i386-gas-sysv/2.0/include/
 
 Build `ftest.c` in `/tmp`: `i=24`, `3->3`, `atof: 0` (libc is soft-float and returns double in eax:edx, gcc 2.0 reads st(0)); `hdr.c`: `hello 5 6 2147483647`, `FLT_DIG=6 DBL_DIG=15`.
 
-0.95 kernel: the stock 0.95 source (`git archive`, repacked as a v7 tar, compressed and dd'd to a floppy), with only `ROOT_DEV=/dev/hd2` and `KBD_US` in `keyboard.S` changed. Do not enable `-fcombine-regs`.
+0.95 kernel: the stock 0.95 source on a floppy made by `mkkernel.sh`, as for 0.12 (`git archive`, repacked as a v7 tar, compressed and dd'd to a floppy), with only `ROOT_DEV=/dev/hd2` and `KBD_US` in `keyboard.S` changed. Do not enable `-fcombine-regs`.
+
+```
+./mkkernel.sh -s /path/to/history -t 0.95 -o kernel095.flp
+```
+
+In the guest (B = kernel095.flp). kinst only unpacks the source and does not build the kernel; existing as/ld/... links are skipped, and `/bin/sync` and `/usr/bin/uname` are rebuilt with gcc 2.0:
+
+```
+mv /usr/src/linux /usr/src/linux-0.12   # kinst does not overwrite an existing /usr/src/linux
+dd if=/dev/fd1 of=/tmp/kinst bs=1024 count=2
+sh /tmp/kinst --apply
+                                        # edit ROOT_DEV and KBD_US with em or sed where mkkernel.sh printed them
+cd /usr/src/linux; make
+dd bs=8192 if=Image of=/dev/fd1         # with a blank floppy in B
+```
 
 Notes:
 
@@ -292,6 +323,7 @@ Notes:
 - gcc 2.0 provides only the driver, cpp, cc1, libgcc.a and headers; as, ld, ar etc. are still the ones from gccbin (1991).
 - The 0.95 build prints many `conflicting types for built-in function` warnings (strlen, memcpy, memcmp): gcc 2.0's default `size_t` is `long unsigned int`, the kernel's is `unsigned int`; identical on i386, harmless. `mkgcc20.sh` adds `#define SIZE_TYPE "unsigned int"` to `config/i386gas.h`, so a gcc 2.0 bootstrapped from this `gccsrc*.flp` no longer warns; one bootstrapped from an older set still does. The stock 0.12 `/usr/include/string.h` also declares the `strlen` result and the `memcpy`/`memcmp` length as `int`, which conflicts with the built-ins too; `mkinstall.sh` changes those three to `size_t` when packing.
 - 0.95 no longer reads SWAP_DEV at offset 506 of the boot diskette; it needs swapon.
+- Every stage of `make bootstrap` prints `make: *** [enquire.o] Error 1 (ignored)`; ignore it. The rule's `-cp $(srcdir)/enquire.c . > /dev/null 2>&1` is meant for building in a separate directory; building in the source directory, `srcdir` is `.`, cp copies the file onto itself and returns 1, and the leading `-` lets make go on to build enquire and generate `float.h` as usual. That `float.h` is off (libc-0.12's printf/sscanf mishandle extreme floating values), so `float.h.ieee` replaces it after install.
 
 ### Pitfalls
 
