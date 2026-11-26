@@ -133,7 +133,7 @@ cp /usr/src/gcc/tools/float.h.ieee /usr/local/lib/gcc/i386-gas-sysv/2.0/include/
 0.95 内核：源码用原版 0.95，和 0.12 一样用 `mkkernel.sh` 做源码盘（`git archive` 后重新打成 v7 tar，compress 后 dd 到软盘），只改 `ROOT_DEV=/dev/hd2` 和 `keyboard.S` 的 `KBD_US`，不要打开 `-fcombine-regs`。
 
 ```
-./mkkernel.sh -s /path/to/history -t 0.95 -o kernel095.flp
+./mkkernel.sh -s /path/to/history -t 0.95 -o kernel095.flp     # 214 / 1440 块
 ```
 
 guest 里（B = kernel095.flp）。kinst 只解开源码，不编译内核；as 等链接已有就跳过，`/bin/sync`、`/usr/bin/uname` 会用 gcc 2.0 重编一遍：
@@ -142,7 +142,8 @@ guest 里（B = kernel095.flp）。kinst 只解开源码，不编译内核；as 
 mv /usr/src/linux /usr/src/linux-0.12   # kinst 不覆盖已有的 /usr/src/linux
 dd if=/dev/fd1 of=/tmp/kinst bs=1024 count=2
 sh /tmp/kinst --apply
-                                        # 按 mkkernel.sh 打印的位置，用 em 或 sed 改 ROOT_DEV 和 KBD_US
+                                        # 用 em 或 sed 改：Makefile 第 22 行 ROOT_DEV=/dev/hdb1 → /dev/hd2，
+                                        # kernel/chr_drv/keyboard.S 第 22 行 KBD_FINNISH → KBD_US
 cd /usr/src/linux; make
 dd bs=8192 if=Image of=/dev/fd1         # B 换一张空白盘
 ```
@@ -302,7 +303,7 @@ Build `ftest.c` in `/tmp`: `i=24`, `3->3`, `atof: 0` (libc is soft-float and ret
 0.95 kernel: the stock 0.95 source on a floppy made by `mkkernel.sh`, as for 0.12 (`git archive`, repacked as a v7 tar, compressed and dd'd to a floppy), with only `ROOT_DEV=/dev/hd2` and `KBD_US` in `keyboard.S` changed. Do not enable `-fcombine-regs`.
 
 ```
-./mkkernel.sh -s /path/to/history -t 0.95 -o kernel095.flp
+./mkkernel.sh -s /path/to/history -t 0.95 -o kernel095.flp     # 214 / 1440 blocks
 ```
 
 In the guest (B = kernel095.flp). kinst only unpacks the source and does not build the kernel; existing as/ld/... links are skipped, and `/bin/sync` and `/usr/bin/uname` are rebuilt with gcc 2.0:
@@ -311,7 +312,8 @@ In the guest (B = kernel095.flp). kinst only unpacks the source and does not bui
 mv /usr/src/linux /usr/src/linux-0.12   # kinst does not overwrite an existing /usr/src/linux
 dd if=/dev/fd1 of=/tmp/kinst bs=1024 count=2
 sh /tmp/kinst --apply
-                                        # edit ROOT_DEV and KBD_US with em or sed where mkkernel.sh printed them
+                                        # edit with em or sed: Makefile line 22 ROOT_DEV=/dev/hdb1 -> /dev/hd2,
+                                        # kernel/chr_drv/keyboard.S line 22 KBD_FINNISH -> KBD_US
 cd /usr/src/linux; make
 dd bs=8192 if=Image of=/dev/fd1         # with a blank floppy in B
 ```
