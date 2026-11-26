@@ -1,0 +1,32 @@
+# gccsw: point /usr/local/bin/gcc and /usr/local/bin/cpp at gcc 1.40 or gcc 2.0
+# (Linux 0.12, bash 1.12). Installed by the gcctools.flp script; the drivers live
+# side by side as /usr/local/bin/gcc-1.40 and /usr/local/bin/gcc-2.0.
+B=/usr/local/bin
+L=/usr/local/lib
+
+usage() {
+  echo "usage: gccsw 1.40|2.0    symlink $B/gcc and $B/cpp to that gcc"
+  echo "       gccsw -h|--help"
+  echo "now:"
+  ls -l $B/gcc $B/cpp
+  exit 1
+}
+
+[ $# = 1 ] || usage
+case "$1" in
+  1.40) G=$B/gcc-1.40; C=$L/gcc-cpp ;;
+  2.0) G=$B/gcc-2.0; C=$L/gcc/i386-gas-sysv/2.0/cpp ;;
+  *) usage ;;
+esac
+[ -f $G ] || { echo "no $G"; exit 1; }
+[ -f $C ] || { echo "no $C"; exit 1; }
+for f in $B/gcc $B/cpp; do
+  case "`ls -l $f 2>/dev/null`" in
+    ""|l*) ;;
+    *) echo "$f is not a symlink; rename it to gcc-1.40 or gcc-2.0 first"; exit 1 ;;
+  esac
+done
+rm -f $B/gcc $B/cpp
+ln -s $G $B/gcc
+ln -s $C $B/cpp
+ls -l $B/gcc $B/cpp

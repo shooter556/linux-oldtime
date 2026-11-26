@@ -19,6 +19,7 @@
 | `mkkernel.sh` | 主机端：生成内核源码盘 `kernel.flp` |
 | `kinst.sh.in` | 源码盘里的 guest 脚本模板 |
 | `mkgcc20.sh` | 主机端：生成自举 gcc 2.0 用的 `gcctools.flp`、`gccsrc1.flp`、`gccsrc2.flp` |
+| `gccsw` | 在 gcc 1.40 和 gcc 2.0 之间切换，由 `gcctools.flp` 装到 `/usr/local/bin` |
 
 主机需要：bash、python3、gzip、tar、`compress`（ncompress 包）；`mkgcc20.sh` 另外要 bzip2 和 gcc（在主机上跑 enquire）。
 
@@ -105,7 +106,7 @@ dd bs=8192 if=Image of=/dev/fd1         # B 换一张空白盘
 ./mkgcc20.sh -s /path/to/oldlinux-files -o gcc20/
 ```
 
-- `gcctools.flp`：打过补丁的 gnulib（`__truncdfsf2` 改 13 个字节）、`/bin/true`（主机上拼的 a.out）、`df.c`、主机上用 gcc 2.0 的 enquire 生成的 `float.h.ieee`、测试程序 `ftest.c`/`hdr.c`；脚本把 as、ld、ar、ranlib、nm、size、strip、gar、cpp 软链接到 `/usr/local/bin`（cpp 指向 2.0 安装后的位置）。
+- `gcctools.flp`：打过补丁的 gnulib（`__truncdfsf2` 改 13 个字节）、`/bin/true`（主机上拼的 a.out）、`df.c`、主机上用 gcc 2.0 的 enquire 生成的 `float.h.ieee`、测试程序 `ftest.c`/`hdr.c`；切换脚本 `gccsw`。盘上的脚本把 as、ld、ar、ranlib、nm、size、strip、gar 软链接到 `/usr/local/bin`，把 1.40 的驱动程序改名为 `/usr/local/bin/gcc-1.40`，装上 `/usr/local/bin/gccsw` 并执行 `gccsw 1.40`。
 - `gccsrc1.flp`、`gccsrc2.flp`：只保留 C 的 gcc-2.0 源码，每张一个独立的 tar.Z。Makefile.in、`config/x-i386v`、`config/t-svr3`、`config/i386gas.h` 已预先改好，加了 `fp387.asm`，改过的文件保留 1992 年的原时间戳。
 
 guest 里，每张盘（顺序：gcctools、gccsrc1、gccsrc2）：
@@ -123,9 +124,21 @@ cd /usr/src/gcc/gcc-2.0
 make bootstrap                          # mv 报 cc1plus、collect2 等不存在是正常的
 for file in *.o; do cmp $file stage2/$file; done
 cmp cc1 stage2/cc1; cmp cpp stage2/cpp; cmp gcc stage2/gcc     # 无输出 = 通过
-cp /usr/local/bin/gcc /usr/local/bin/gcc140                    # 安装会覆盖 1.40 的驱动
 make CC="stage2/gcc -Bstage2/" CFLAGS=-O install-common install-libgcc install-headers
+mv /usr/local/bin/gcc /usr/local/bin/gcc-2.0                   # install 删掉 gcc 链接，装上了 2.0 的驱动
+gccsw 2.0
 cp /usr/src/gcc/tools/float.h.ieee /usr/local/lib/gcc/i386-gas-sysv/2.0/include/float.h
+```
+
+两套 gcc 并存：驱动程序是 `/usr/local/bin/gcc-1.40` 和 `gcc-2.0`，各自的 cc1、cpp 等在 `/usr/local/lib/gcc-*`（1.40）和 `/usr/local/lib/gcc/i386-gas-sysv/2.0/`（2.0），as、ld 等两边共用。`gccsw 1.40` 或 `gccsw 2.0` 把 `/usr/local/bin/gcc` 和 `/usr/local/bin/cpp` 软链接到对应版本，不带参数时显示当前指向。0.12 内核用 1.40 编（它的内嵌汇编 gcc 2.0 不接受），0.95 内核和 [../0.95](../0.95/) 的 `br build` 用 2.0（`br` 会检查）。
+
+按旧流程装过的系统（有 `gcc140`，`gcc` 是 2.0 的驱动）：
+
+```
+mv /usr/local/bin/gcc140 /usr/local/bin/gcc-1.40
+mv /usr/local/bin/gcc /usr/local/bin/gcc-2.0
+                                        # 用新做的 gcctools.flp 再跑一次它的脚本，装上 gccsw
+gccsw 2.0
 ```
 
 在 `/tmp` 编 `ftest.c`：`i=24`、`3->3`、`atof: 0`（libc 是软浮点，double 返回值放在 eax:edx，gcc 2.0 从 st(0) 取，所以是 0）；`hdr.c`：`hello 5 6 2147483647`、`FLT_DIG=6 DBL_DIG=15`。
@@ -189,6 +202,7 @@ Tested on 86Box (i386SX, 387, 8 MB RAM, IDE disk 128 cyl / 16 heads / 63 sectors
 | `mkkernel.sh` | host: builds the kernel source floppy `kernel.flp` |
 | `kinst.sh.in` | guest script template stored on the source floppy |
 | `mkgcc20.sh` | host: builds `gcctools.flp`, `gccsrc1.flp`, `gccsrc2.flp` for bootstrapping gcc 2.0 |
+| `gccsw` | switches between gcc 1.40 and gcc 2.0; `gcctools.flp` installs it into `/usr/local/bin` |
 
 Host requirements: bash, python3, gzip, tar, `compress` (ncompress); `mkgcc20.sh` also needs bzip2 and gcc (to run enquire on the host).
 
@@ -275,7 +289,7 @@ On the installed 0.12, gcc 1.40 does a three-stage bootstrap of the official gcc
 ./mkgcc20.sh -s /path/to/oldlinux-files -o gcc20/
 ```
 
-- `gcctools.flp`: patched gnulib (13 bytes in `__truncdfsf2`), `/bin/true` (an a.out built on the host), `df.c`, `float.h.ieee` produced on the host by gcc 2.0's enquire, test programs `ftest.c`/`hdr.c`. Its script symlinks as, ld, ar, ranlib, nm, size, strip, gar and cpp into `/usr/local/bin` (cpp points at where gcc 2.0 installs it).
+- `gcctools.flp`: patched gnulib (13 bytes in `__truncdfsf2`), `/bin/true` (an a.out built on the host), `df.c`, `float.h.ieee` produced on the host by gcc 2.0's enquire, test programs `ftest.c`/`hdr.c`. the switch script `gccsw`. Its script symlinks as, ld, ar, ranlib, nm, size, strip and gar into `/usr/local/bin`, renames the 1.40 driver to `/usr/local/bin/gcc-1.40`, installs `/usr/local/bin/gccsw` and runs `gccsw 1.40`.
 - `gccsrc1.flp`, `gccsrc2.flp`: the gcc-2.0 source trimmed to C, one independent tar.Z each. Makefile.in, `config/x-i386v`, `config/t-svr3` and `config/i386gas.h` are pre-patched, `fp387.asm` is added, and patched files keep their 1992 timestamps.
 
 In the guest, for each floppy (order: gcctools, gccsrc1, gccsrc2):
@@ -293,9 +307,21 @@ cd /usr/src/gcc/gcc-2.0
 make bootstrap                          # mv complaining about cc1plus, collect2 etc. is normal
 for file in *.o; do cmp $file stage2/$file; done
 cmp cc1 stage2/cc1; cmp cpp stage2/cpp; cmp gcc stage2/gcc     # no output = pass
-cp /usr/local/bin/gcc /usr/local/bin/gcc140                    # install overwrites the 1.40 driver
 make CC="stage2/gcc -Bstage2/" CFLAGS=-O install-common install-libgcc install-headers
+mv /usr/local/bin/gcc /usr/local/bin/gcc-2.0                   # install removed the gcc link and put the 2.0 driver there
+gccsw 2.0
 cp /usr/src/gcc/tools/float.h.ieee /usr/local/lib/gcc/i386-gas-sysv/2.0/include/float.h
+```
+
+Two gccs side by side: the drivers are `/usr/local/bin/gcc-1.40` and `gcc-2.0`; their cc1, cpp and friends are in `/usr/local/lib/gcc-*` (1.40) and `/usr/local/lib/gcc/i386-gas-sysv/2.0/` (2.0); as, ld and the rest are shared. `gccsw 1.40` or `gccsw 2.0` symlinks `/usr/local/bin/gcc` and `/usr/local/bin/cpp` to that version; without an argument it shows where they point. Build the 0.12 kernel with 1.40 (gcc 2.0 rejects its inline asm), the 0.95 kernel and [../0.95](../0.95/)'s `br build` with 2.0 (`br` checks).
+
+A system installed with the old steps (with `gcc140`, and `gcc` being the 2.0 driver):
+
+```
+mv /usr/local/bin/gcc140 /usr/local/bin/gcc-1.40
+mv /usr/local/bin/gcc /usr/local/bin/gcc-2.0
+                                        # run the script of a freshly made gcctools.flp again to get gccsw
+gccsw 2.0
 ```
 
 Build `ftest.c` in `/tmp`: `i=24`, `3->3`, `atof: 0` (libc is soft-float and returns double in eax:edx, gcc 2.0 reads st(0)); `hdr.c`: `hello 5 6 2147483647`, `FLT_DIG=6 DBL_DIG=15`.

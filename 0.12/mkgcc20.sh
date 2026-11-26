@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -eu -o pipefail
 
+HERE=$(cd "$(dirname "$0")" && pwd)
 SRC=${OLDLINUX:-}
 
 usage() {
@@ -8,7 +9,8 @@ usage() {
     echo
     echo "Build raw 1.44M floppies to bootstrap gcc 2.0 with gcc 1.40 on Linux 0.12:"
     echo "  gcctools.flp      patched gnulib (__truncdfsf2), /bin/true, df.c, float.h.ieee,"
-    echo "                    ftest.c, hdr.c; its script symlinks as/ld/ar/ranlib/nm/size/strip/gar/cpp"
+    echo "                    ftest.c, hdr.c, gccsw; its script symlinks as/ld/ar/ranlib/nm/size/strip/gar,"
+    echo "                    renames the 1.40 driver to gcc-1.40 and runs gccsw 1.40"
     echo "  gccsrc1..N.flp    gcc-2.0 trimmed to C only and pre-patched (Makefile.in, x-i386v,"
     echo "                    t-svr3, i386gas.h, fp387.asm); each one an independent tar.Z"
     echo "Each floppy starts with a 2K guest script: dd if=/dev/fd1 of=/tmp/g bs=1024 count=2"
@@ -162,6 +164,7 @@ hdr = struct.pack("<8I", 0x010b, 4096, 0, 0, 0, 0, 0, 0)
 open(sys.argv[1], "wb").write(hdr.ljust(1024, b"\0") + code.ljust(4096, b"\0"))
 ' "$T/true"
 cp "$DFC" "$T/df.c"
+cp "$HERE/gccsw" "$T/gccsw"
 gcc -w -std=gnu89 -mlong-double-64 -DNO_SC -o "$W/enquire" "$G/enquire.c"
 "$W/enquire" -f > "$T/float.h.ieee"
 ! grep -q WARNING "$T/float.h.ieee" || { echo "[ERROR] host enquire warned" >&2; exit 1; }
@@ -308,14 +311,18 @@ done < "$W/groups"
 tar --format=v7 --owner=0 --group=0 -cf "$W/tools.tar" -C "$W/tools" usr
 compress -c "$W/tools.tar" > "$W/tools.tar.Z"
 N=$(blocks "$W/tools.tar.Z")
-header "gcc 2.0 bootstrap tools floppy" "install tools into \$DIR/tools, as/ld/ar/ranlib/nm/size/strip/gar/cpp symlinks, fixed gnulib, /bin/true, df" "T=\$DIR/tools
+header "gcc 2.0 bootstrap tools floppy" "install tools into \$DIR/tools, as/ld/ar/ranlib/nm/size/strip/gar symlinks, gcc -> gcc-1.40 via gccsw, fixed gnulib, /bin/true, df" "T=\$DIR/tools
 run \"cd /\"
 run \"dd if=\$FD bs=1024 skip=$SCRIPT_N count=$N | compress -d | tar xvf -\"
 for p in as ld ar ranlib nm size strip; do
   [ -f /usr/local/bin/\$p ] || run \"ln -s /usr/local/lib/gcc-\$p /usr/local/bin/\$p\"
 done
 [ -f /usr/local/bin/gar ] || run \"ln -s /usr/local/lib/gcc-ar /usr/local/bin/gar\"
-[ -f /usr/local/bin/cpp ] || run \"ln -s /usr/local/lib/gcc/i386-gas-sysv/2.0/cpp /usr/local/bin/cpp\"
+# the 1.40 driver becomes gcc-1.40; gccsw symlinks gcc and cpp to the chosen version
+run \"cp \$T/gccsw /usr/local/bin/gccsw\"
+run \"chmod 755 /usr/local/bin/gccsw\"
+[ -f /usr/local/bin/gcc-1.40 ] || run \"mv /usr/local/bin/gcc /usr/local/bin/gcc-1.40\"
+run \"sh /usr/local/bin/gccsw 1.40\"
 [ -f /usr/local/lib/gnulib.orig ] || run \"cp /usr/local/lib/gnulib /usr/local/lib/gnulib.orig\"
 run \"cp \$T/gnulib /usr/local/lib/gnulib\"
 run \"cp \$T/true /bin/true\"
