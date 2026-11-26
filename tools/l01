@@ -1,0 +1,27 @@
+#!/bin/sh
+# Run l01run.py / minixget.py with a private venv next to this script; the venv
+# (with unicorn) is created on first use, so a fresh machine needs only python3.
+D=$(cd "$(dirname "$0")" && pwd)
+V=$D/.venv
+usage() {
+  cat <<EOF
+Usage: l01 run [-C|--chdir DIR] BINARY ARGS...  run a Linux 0.11-0.95 a.out (L01ROOT=DIR maps / into DIR)
+       l01 get -i IMAGE [-p N] -o DIR           extract a Minix v1 fs (partition N) into DIR
+       l01 -s|--setup                           only (re)create the venv in $V
+       l01 -h|--help
+EOF
+}
+setup() {
+  rm -rf "$V"
+  python3 -m venv "$V" && "$V/bin/pip" install -q --disable-pip-version-check unicorn || exit 1
+}
+case "$1" in
+  ""|-h|--help) usage; exit 0 ;;
+  -s|--setup) setup; exit 0 ;;
+esac
+[ -x "$V/bin/python" ] && "$V/bin/python" -c 'import unicorn' 2>/dev/null || setup
+case "$1" in
+  run) shift; exec "$V/bin/python" "$D/l01run.py" "$@" ;;
+  get) shift; exec "$V/bin/python" "$D/minixget.py" "$@" ;;
+  *) usage; exit 1 ;;
+esac
