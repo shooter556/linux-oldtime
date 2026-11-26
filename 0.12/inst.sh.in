@@ -114,7 +114,7 @@ install)
   run "/mnt/bin/tar cf - bin dev etc usr | (cd /mnt; /mnt/bin/tar xf -)"
   run "dd if=$FD bs=1024 skip=@PKG_O@ count=@PKG_N@ | /mnt/bin/compress -d | (cd /mnt; /mnt/bin/tar xvf -)"
   if [ $DRY = 0 ]; then
-    echo -n "put boot.flp into drive B, then press Enter "; read a
+    echo -n "put boot.flp into drive B, then press Enter. This is a READ-ONLY operation. "; read a
   fi
   run "dd if=$FD of=/mnt/Image0 bs=512 count=@IMAGE_S@"
   run "(dd if=/mnt/Image0 bs=506 count=1; echo -n -e '\001\003\002\003'; dd if=/mnt/Image0 bs=510 skip=1) > /mnt/Image"
