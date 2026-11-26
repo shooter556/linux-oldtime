@@ -88,7 +88,7 @@ sh /tmp/inst install --apply            # mkswap hd1、mkfs hd2、拷 root 盘�
 
 ```
 dd if=/dev/fd1 of=/tmp/kinst bs=1024 count=2
-sh /tmp/kinst --apply                   # gas/gld/gar/cpp 硬链接、解源码、用 gcc 编 /bin/sync 测试 gcc，再编 /usr/bin/uname
+sh /tmp/kinst --apply                   # gas/gld/gar/cpp 软链接、解源码、用 gcc 编 /bin/sync 测试 gcc，再编 /usr/bin/uname
 cd /usr/src/linux; make
 dd bs=8192 if=Image of=/dev/fd1         # B 换一张空白盘
 ```
@@ -241,7 +241,7 @@ Rebuilding the kernel (booted from the hard disk, B = kernel.flp):
 
 ```
 dd if=/dev/fd1 of=/tmp/kinst bs=1024 count=2
-sh /tmp/kinst --apply                   # hard-link gas/gld/gar/cpp, unpack the source, build /bin/sync to test gcc, then /usr/bin/uname
+sh /tmp/kinst --apply                   # symlink gas/gld/gar/cpp, unpack the source, build /bin/sync to test gcc, then /usr/bin/uname
 cd /usr/src/linux; make
 dd bs=8192 if=Image of=/dev/fd1         # with a blank floppy in B
 ```

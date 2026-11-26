@@ -5,7 +5,7 @@ SRC=/usr/src/linux
 
 usage() {
   echo "usage: sh /tmp/kinst -n|--dry-run|-a|--apply"
-  echo "  link gas/gld/gar/cpp to gcc-*, unpack stock source into $SRC,"
+  echo "  symlink gas/gld/gar/cpp to gcc-*, unpack stock source into $SRC,"
   echo "  build /bin/sync from /usr/src/sync.c as a gcc test, /usr/bin/uname from"
   echo "  /usr/src/uname.c (put there by install.flp)"
   echo "  -n, --dry-run  print commands only;  -a, --apply  really run"
@@ -26,7 +26,7 @@ esac
 
 for p in as:gas ld:gld ar:gar cpp:cpp; do
   set -- `echo $p | sed 's/:/ /'`
-  [ -f /usr/local/bin/$2 ] || run "ln /usr/local/lib/gcc-$1 /usr/local/bin/$2"
+  [ -f /usr/local/bin/$2 ] || run "ln -s /usr/local/lib/gcc-$1 /usr/local/bin/$2"
 done
 [ -d /usr/src ] || run "mkdir /usr/src"
 [ -d $SRC ] && { echo "$SRC already exists, remove it first"; exit 1; }
