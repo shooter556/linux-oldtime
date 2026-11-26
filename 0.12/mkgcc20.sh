@@ -10,7 +10,7 @@ usage() {
     echo "Build raw 1.44M floppies to bootstrap gcc 2.0 with gcc 1.40 on Linux 0.12:"
     echo "  gcctools.flp      patched gnulib (__truncdfsf2), /bin/true, df.c, float.h.ieee,"
     echo "                    ftest.c, hdr.c, gccsw; its script symlinks as/ld/ar/ranlib/nm/size/strip/gar,"
-    echo "                    renames the 1.40 driver to gcc-1.40 and runs gccsw 1.40"
+    echo "                    runs gccsw 1.40 (renames the 1.40 driver to gcc-1.40)"
     echo "  gccsrc1..N.flp    gcc-2.0 trimmed to C only and pre-patched (Makefile.in, x-i386v,"
     echo "                    t-svr3, i386gas.h, fp387.asm); each one an independent tar.Z"
     echo "Each floppy starts with a 2K guest script: dd if=/dev/fd1 of=/tmp/g bs=1024 count=2"
@@ -163,7 +163,8 @@ code = bytes.fromhex("31dbb801000000cd80")
 hdr = struct.pack("<8I", 0x010b, 4096, 0, 0, 0, 0, 0, 0)
 open(sys.argv[1], "wb").write(hdr.ljust(1024, b"\0") + code.ljust(4096, b"\0"))
 ' "$T/true"
-cp "$DFC" "$T/df.c"
+# df.c is CRLF; gcc 2.0 (ANSI) does not take \r as white space, gcc 1.40 does
+tr -d '\r' < "$DFC" > "$T/df.c"
 cp "$HERE/gccsw" "$T/gccsw"
 gcc -w -std=gnu89 -mlong-double-64 -DNO_SC -o "$W/enquire" "$G/enquire.c"
 "$W/enquire" -f > "$T/float.h.ieee"
@@ -318,10 +319,9 @@ for p in as ld ar ranlib nm size strip; do
   [ -f /usr/local/bin/\$p ] || run \"ln -s /usr/local/lib/gcc-\$p /usr/local/bin/\$p\"
 done
 [ -f /usr/local/bin/gar ] || run \"ln -s /usr/local/lib/gcc-ar /usr/local/bin/gar\"
-# the 1.40 driver becomes gcc-1.40; gccsw symlinks gcc and cpp to the chosen version
+# gccsw renames a regular-file gcc to gcc-<its gcc -v version>, then symlinks gcc and cpp
 run \"cp \$T/gccsw /usr/local/bin/gccsw\"
 run \"chmod 755 /usr/local/bin/gccsw\"
-[ -f /usr/local/bin/gcc-1.40 ] || run \"mv /usr/local/bin/gcc /usr/local/bin/gcc-1.40\"
 run \"sh /usr/local/bin/gccsw 1.40\"
 [ -f /usr/local/lib/gnulib.orig ] || run \"cp /usr/local/lib/gnulib /usr/local/lib/gnulib.orig\"
 run \"cp \$T/gnulib /usr/local/lib/gnulib\"

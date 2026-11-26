@@ -106,7 +106,7 @@ dd bs=8192 if=Image of=/dev/fd1         # B 换一张空白盘
 ./mkgcc20.sh -s /path/to/oldlinux-files -o gcc20/
 ```
 
-- `gcctools.flp`：打过补丁的 gnulib（`__truncdfsf2` 改 13 个字节）、`/bin/true`（主机上拼的 a.out）、`df.c`、主机上用 gcc 2.0 的 enquire 生成的 `float.h.ieee`、测试程序 `ftest.c`/`hdr.c`；切换脚本 `gccsw`。盘上的脚本把 as、ld、ar、ranlib、nm、size、strip、gar 软链接到 `/usr/local/bin`，把 1.40 的驱动程序改名为 `/usr/local/bin/gcc-1.40`，装上 `/usr/local/bin/gccsw` 并执行 `gccsw 1.40`。
+- `gcctools.flp`：打过补丁的 gnulib（`__truncdfsf2` 改 13 个字节）、`/bin/true`（主机上拼的 a.out）、`df.c`、主机上用 gcc 2.0 的 enquire 生成的 `float.h.ieee`、测试程序 `ftest.c`/`hdr.c`；切换脚本 `gccsw`。盘上的脚本把 as、ld、ar、ranlib、nm、size、strip、gar 软链接到 `/usr/local/bin`，装上 `/usr/local/bin/gccsw` 并执行 `gccsw 1.40`（把 1.40 的驱动程序改名为 `gcc-1.40`）。`df.c` 原文件是 CRLF 换行，打包时去掉 `\r`。
 - `gccsrc1.flp`、`gccsrc2.flp`：只保留 C 的 gcc-2.0 源码，每张一个独立的 tar.Z。Makefile.in、`config/x-i386v`、`config/t-svr3`、`config/i386gas.h` 已预先改好，加了 `fp387.asm`，改过的文件保留 1992 年的原时间戳。
 
 guest 里，每张盘（顺序：gcctools、gccsrc1、gccsrc2）：
@@ -125,20 +125,18 @@ make bootstrap                          # mv 报 cc1plus、collect2 等不存在
 for file in *.o; do cmp $file stage2/$file; done
 cmp cc1 stage2/cc1; cmp cpp stage2/cpp; cmp gcc stage2/gcc     # 无输出 = 通过
 make CC="stage2/gcc -Bstage2/" CFLAGS=-O install-common install-libgcc install-headers
-mv /usr/local/bin/gcc /usr/local/bin/gcc-2.0                   # install 删掉 gcc 链接，装上了 2.0 的驱动
-gccsw 2.0
+gccsw 2.0                               # install 删掉 gcc 链接，换成 2.0 的驱动；gccsw 把它改名为 gcc-2.0
 cp /usr/src/gcc/tools/float.h.ieee /usr/local/lib/gcc/i386-gas-sysv/2.0/include/float.h
 ```
 
 两套 gcc 并存：驱动程序是 `/usr/local/bin/gcc-1.40` 和 `gcc-2.0`，各自的 cc1、cpp 等在 `/usr/local/lib/gcc-*`（1.40）和 `/usr/local/lib/gcc/i386-gas-sysv/2.0/`（2.0），as、ld 等两边共用。`gccsw 1.40` 或 `gccsw 2.0` 把 `/usr/local/bin/gcc` 和 `/usr/local/bin/cpp` 软链接到对应版本，不带参数时显示当前指向。0.12 内核用 1.40 编（它的内嵌汇编 gcc 2.0 不接受），0.95 内核和 [../0.95](../0.95/) 的 `br build` 用 2.0（`br` 会检查）。
 
-按旧流程装过的系统（有 `gcc140`，`gcc` 是 2.0 的驱动）：
+`gccsw` 按 `gcc -v` 认版本：`gcc`（或旧流程留下的 `gcc140`）还是普通文件时，先改名成 `gcc-1.40` 或 `gcc-2.0`；名字已被占用就报错停下。切换前也用 `-v` 核对 `gcc-<版本>` 确实是那个版本。所以按旧流程装过 2.0 的系统，用新做的 gcctools.flp 再跑一次它的脚本即可（它会执行 `gccsw 1.40`）。如果当年没备份 1.40、驱动已被 2.0 覆盖，`gccsw 1.40` 会报 `no /usr/local/bin/gcc-1.40`，从 `install.flp` 取回 1.40 的驱动（B = install.flp，块数见 inst 脚本）：
 
 ```
-mv /usr/local/bin/gcc140 /usr/local/bin/gcc-1.40
-mv /usr/local/bin/gcc /usr/local/bin/gcc-2.0
-                                        # 用新做的 gcctools.flp 再跑一次它的脚本，装上 gccsw
-gccsw 2.0
+cd /tmp
+dd if=/dev/fd1 bs=1024 skip=185 count=1240 | compress -d | tar xvf - usr/local/bin/gcc
+mv /tmp/usr/local/bin/gcc /usr/local/bin/gcc-1.40; rm -rf /tmp/usr
 ```
 
 在 `/tmp` 编 `ftest.c`：`i=24`、`3->3`、`atof: 0`（libc 是软浮点，double 返回值放在 eax:edx，gcc 2.0 从 st(0) 取，所以是 0）；`hdr.c`：`hello 5 6 2147483647`、`FLT_DIG=6 DBL_DIG=15`。
@@ -168,6 +166,7 @@ dd bs=8192 if=Image of=/dev/fd1         # B 换一张空白盘
 - gcc 2.0 只提供驱动、cpp、cc1、libgcc.a 和头文件；as、ld、ar 等仍是 gccbin（1991）里的。
 - 0.95 内核里有大量 `conflicting types for built-in function` 警告（strlen、memcpy、memcmp）：gcc 2.0 默认的 `size_t` 是 `long unsigned int`，内核是 `unsigned int`，i386 上一样，可以忽略。`mkgcc20.sh` 在 `config/i386gas.h` 里加了 `#define SIZE_TYPE "unsigned int"`，用这版 `gccsrc*.flp` 自举出来的 gcc 2.0 不会再报；更早做的盘自举出来的仍会报。另外 0.12 自带的 `/usr/include/string.h` 把 `strlen` 的返回值、`memcpy`/`memcmp` 的长度都写成 `int`，同样和内建声明冲突，`mkinstall.sh` 打包时把这三处改成了 `size_t`。
 - 0.95 不再读 boot 盘偏移 506 的 SWAP_DEV，要用 swapon。
+- CRLF 换行的源码 gcc 1.40 能编，gcc 2.0 报 `parse error before character 015`（015 是 `\r`）：两边的 cpp 都把 `\r` 原样传给 cc1，1.40 的 `c-parse.y` 把 `\r` 当空白，2.0 的 `c-lex.c` 按 ANSI 不当（`skip_white_space` 里 `#if 0 /* ANSI says no. */`，`yylex` 只在 `-traditional` 时跳过，所以 `-traditional` 也救不全）。后面跟着的 `sys/time.h` 报错是连带的。oldlinux-files 的 `Linux-0.12/sources/sbin/df.c` 就是 CRLF，`mkgcc20.sh` 打包时去掉 `\r`，让两个版本都能编。
 - `make bootstrap` 每一阶段都会出现 `make: *** [enquire.o] Error 1 (ignored)`，可以忽略。规则里的 `-cp $(srcdir)/enquire.c . > /dev/null 2>&1` 是给另建目录编译用的；在源码目录里编时 `srcdir` 就是 `.`，cp 把文件拷给自己，返回 1，开头的 `-` 让 make 继续，接着照常编 enquire、生成 `float.h`。这个 `float.h` 不准（libc-0.12 的 printf/sscanf 处理极端浮点值有错），安装后用 `float.h.ieee` 替换。
 
 ### 遇到的坑
@@ -289,7 +288,7 @@ On the installed 0.12, gcc 1.40 does a three-stage bootstrap of the official gcc
 ./mkgcc20.sh -s /path/to/oldlinux-files -o gcc20/
 ```
 
-- `gcctools.flp`: patched gnulib (13 bytes in `__truncdfsf2`), `/bin/true` (an a.out built on the host), `df.c`, `float.h.ieee` produced on the host by gcc 2.0's enquire, test programs `ftest.c`/`hdr.c`. the switch script `gccsw`. Its script symlinks as, ld, ar, ranlib, nm, size, strip and gar into `/usr/local/bin`, renames the 1.40 driver to `/usr/local/bin/gcc-1.40`, installs `/usr/local/bin/gccsw` and runs `gccsw 1.40`.
+- `gcctools.flp`: patched gnulib (13 bytes in `__truncdfsf2`), `/bin/true` (an a.out built on the host), `df.c`, `float.h.ieee` produced on the host by gcc 2.0's enquire, test programs `ftest.c`/`hdr.c`. the switch script `gccsw`. Its script symlinks as, ld, ar, ranlib, nm, size, strip and gar into `/usr/local/bin`, installs `/usr/local/bin/gccsw` and runs `gccsw 1.40` (which renames the 1.40 driver to `gcc-1.40`). `df.c` is CRLF in the original and loses its `\r` when packed.
 - `gccsrc1.flp`, `gccsrc2.flp`: the gcc-2.0 source trimmed to C, one independent tar.Z each. Makefile.in, `config/x-i386v`, `config/t-svr3` and `config/i386gas.h` are pre-patched, `fp387.asm` is added, and patched files keep their 1992 timestamps.
 
 In the guest, for each floppy (order: gcctools, gccsrc1, gccsrc2):
@@ -308,20 +307,18 @@ make bootstrap                          # mv complaining about cc1plus, collect2
 for file in *.o; do cmp $file stage2/$file; done
 cmp cc1 stage2/cc1; cmp cpp stage2/cpp; cmp gcc stage2/gcc     # no output = pass
 make CC="stage2/gcc -Bstage2/" CFLAGS=-O install-common install-libgcc install-headers
-mv /usr/local/bin/gcc /usr/local/bin/gcc-2.0                   # install removed the gcc link and put the 2.0 driver there
-gccsw 2.0
+gccsw 2.0                               # install replaced the gcc link with the 2.0 driver; gccsw renames it to gcc-2.0
 cp /usr/src/gcc/tools/float.h.ieee /usr/local/lib/gcc/i386-gas-sysv/2.0/include/float.h
 ```
 
 Two gccs side by side: the drivers are `/usr/local/bin/gcc-1.40` and `gcc-2.0`; their cc1, cpp and friends are in `/usr/local/lib/gcc-*` (1.40) and `/usr/local/lib/gcc/i386-gas-sysv/2.0/` (2.0); as, ld and the rest are shared. `gccsw 1.40` or `gccsw 2.0` symlinks `/usr/local/bin/gcc` and `/usr/local/bin/cpp` to that version; without an argument it shows where they point. Build the 0.12 kernel with 1.40 (gcc 2.0 rejects its inline asm), the 0.95 kernel and [../0.95](../0.95/)'s `br build` with 2.0 (`br` checks).
 
-A system installed with the old steps (with `gcc140`, and `gcc` being the 2.0 driver):
+`gccsw` goes by `gcc -v`: while `gcc` (or a `gcc140` left by the old steps) is still a regular file, it is renamed to `gcc-1.40` or `gcc-2.0` first, stopping with an error if that name is taken; before switching, `-v` also confirms that `gcc-<version>` really is that version. So on a system that installed 2.0 with the old steps, just run the script of a freshly made gcctools.flp again (it runs `gccsw 1.40`). If 1.40 was never backed up and its driver was overwritten by 2.0, `gccsw 1.40` reports `no /usr/local/bin/gcc-1.40`; get the 1.40 driver back from `install.flp` (B = install.flp; block numbers as in the inst script):
 
 ```
-mv /usr/local/bin/gcc140 /usr/local/bin/gcc-1.40
-mv /usr/local/bin/gcc /usr/local/bin/gcc-2.0
-                                        # run the script of a freshly made gcctools.flp again to get gccsw
-gccsw 2.0
+cd /tmp
+dd if=/dev/fd1 bs=1024 skip=185 count=1240 | compress -d | tar xvf - usr/local/bin/gcc
+mv /tmp/usr/local/bin/gcc /usr/local/bin/gcc-1.40; rm -rf /tmp/usr
 ```
 
 Build `ftest.c` in `/tmp`: `i=24`, `3->3`, `atof: 0` (libc is soft-float and returns double in eax:edx, gcc 2.0 reads st(0)); `hdr.c`: `hello 5 6 2147483647`, `FLT_DIG=6 DBL_DIG=15`.
@@ -351,6 +348,7 @@ Notes:
 - gcc 2.0 provides only the driver, cpp, cc1, libgcc.a and headers; as, ld, ar etc. are still the ones from gccbin (1991).
 - The 0.95 build prints many `conflicting types for built-in function` warnings (strlen, memcpy, memcmp): gcc 2.0's default `size_t` is `long unsigned int`, the kernel's is `unsigned int`; identical on i386, harmless. `mkgcc20.sh` adds `#define SIZE_TYPE "unsigned int"` to `config/i386gas.h`, so a gcc 2.0 bootstrapped from this `gccsrc*.flp` no longer warns; one bootstrapped from an older set still does. The stock 0.12 `/usr/include/string.h` also declares the `strlen` result and the `memcpy`/`memcmp` length as `int`, which conflicts with the built-ins too; `mkinstall.sh` changes those three to `size_t` when packing.
 - 0.95 no longer reads SWAP_DEV at offset 506 of the boot diskette; it needs swapon.
+- CRLF source builds with gcc 1.40 but gcc 2.0 says `parse error before character 015` (015 is `\r`): both cpps pass `\r` through to cc1; 1.40's `c-parse.y` takes `\r` as white space, 2.0's `c-lex.c` follows ANSI and does not (`#if 0 /* ANSI says no. */` in `skip_white_space`, and `yylex` skips it only with `-traditional`, so `-traditional` does not fully help). The `sys/time.h` errors that follow are knock-on. oldlinux-files' `Linux-0.12/sources/sbin/df.c` is CRLF; `mkgcc20.sh` strips the `\r` when packing so both versions build it.
 - Every stage of `make bootstrap` prints `make: *** [enquire.o] Error 1 (ignored)`; ignore it. The rule's `-cp $(srcdir)/enquire.c . > /dev/null 2>&1` is meant for building in a separate directory; building in the source directory, `srcdir` is `.`, cp copies the file onto itself and returns 1, and the leading `-` lets make go on to build enquire and generate `float.h` as usual. That `float.h` is off (libc-0.12's printf/sscanf mishandle extreme floating values), so `float.h.ieee` replaces it after install.
 
 ### Pitfalls
