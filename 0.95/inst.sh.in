@@ -128,6 +128,7 @@ install)
     run "ln -s /usr/local/lib/gcc-$p /mnt/usr/local/bin/$p"
   done
   run "ln -s /usr/local/lib/gcc-ar /mnt/usr/local/bin/gar"
+  run "ln -s /usr/local/bin/gcc-2.0 /mnt/usr/local/bin/gcc"
   run "ln -s /usr/local/lib/gcc/i386-gas-sysv/2.0/cpp /mnt/usr/local/bin/cpp"
   run "echo 'PATH=/usr/local/bin:/bin:/usr/bin:/etc; export PATH' > /mnt/etc/profile"
   run "(echo 'swapon $SWAP'; cat /etc/rc) > /mnt/etc/rc"

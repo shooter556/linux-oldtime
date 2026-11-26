@@ -34,7 +34,7 @@ BIN="poe-IGL/init poe-IGL/agetty poe-IGL/login system/mkfs system/mkswap system/
 BIN="$BIN fdisk df mount umount swapon sync uname"
 FU="ls cp mv rm ln mkdir rmdir chmod chown chgrp touch dd"
 XBIN="bin/vi bin/tar bin/compress"
-GCC="usr/local/bin/gcc usr/local/lib/gcc usr/local/lib/crt0.o usr/include usr/bin/make"
+GCC="usr/local/bin/gcc-2.0 usr/local/lib/gcc usr/local/lib/crt0.o usr/include usr/bin/make"
 for p in as ld ar ranlib nm size strip; do GCC="$GCC usr/local/lib/gcc-$p"; done
 TOOLS="basename file magic grep egrep sed stty uniq cmp cut du head tail paste mkfifo"
 TOOLS="$TOOLS split tac expand unexpand dir vdir em kermit as86 ld86"
@@ -56,6 +56,10 @@ unpack)
   echo "next: sh /tmp/br build --apply"
   ;;
 build)
+  case "`ls -l /usr/local/bin/gcc`" in
+    *gcc-2.0) ;;
+    *) echo "/usr/local/bin/gcc is not gcc 2.0, run: gccsw 2.0"; exit 1 ;;
+  esac
   run "(cd $D; make)"
   run "(cd $L; make)"
   echo "next: put a blank floppy into drive B, then: sh /tmp/br boot --apply"

@@ -67,7 +67,7 @@ guest 里（已装好的 0.12 + gcc 2.0，B = br095.flp）：
 ```
 dd if=/dev/fd1 of=/tmp/br bs=1024 count=7
 sh /tmp/br unpack --apply     # 解到 /usr/src/linux 和 /usr/src/0.95（已存在则拒绝）
-sh /tmp/br build --apply      # make root 盘程序，再 make 0.95 内核
+sh /tmp/br build --apply      # make root 盘程序，再 make 0.95 内核；gcc 要先 gccsw 2.0（见 ../0.12）
                               # B 换成 boot.flp
 sh /tmp/br boot --apply       # dd Image 到 B
                               # B 换成 root.flp
@@ -86,7 +86,7 @@ root 盘的 `/dev`（0.95 新编号）：`PS0 PS1 at0 at1`、`hda hda1–8`（3,
 
 一套东西压缩后约 1.7M，分两张盘：
 
-- `gcc.flp`：开头 8 块是安装脚本（`inst.sh.in` 填上块数），后面是一个 compress 过的 tar：0.12 硬盘上的 gcc 2.0（`/usr/local`）、gccbin 的 as/ld 等、libc-0.12（作 `/usr/local/lib/libc.a`）、`/usr/include`（换上 0.95 内核的 `string.h`）、`/usr/bin/make`，以及 ShoeLace 和偏移 508 改成 `02 03` 的 `/Image`
+- `gcc.flp`：开头 8 块是安装脚本（`inst.sh.in` 填上块数），后面是一个 compress 过的 tar：0.12 硬盘上的 gcc 2.0（`/usr/local`，驱动取 `gcc-2.0`，0.95 上由安装脚本软链接成 `gcc`）、gccbin 的 as/ld 等、libc-0.12（作 `/usr/local/lib/libc.a`）、`/usr/include`（换上 0.95 内核的 `string.h`）、`/usr/bin/make`，以及 ShoeLace 和偏移 508 改成 `02 03` 的 `/Image`
 - `tools.flp`：0.12 硬盘 `/usr/bin` 里 root 盘没有的工具：grep egrep sed head tail cmp cut paste du split tac expand unexpand basename file stty uniq mkfifo dir vdir em kermit as86 ld86 等，加上 build 时编的 gzip 1.1.1
 
 0.12 里（B = br095.flp，源码已 unpack、build）：
@@ -218,7 +218,7 @@ In the guest (installed 0.12 + gcc 2.0, B = br095.flp):
 ```
 dd if=/dev/fd1 of=/tmp/br bs=1024 count=7
 sh /tmp/br unpack --apply     # unpack into /usr/src/linux and /usr/src/0.95 (refuses if they exist)
-sh /tmp/br build --apply      # make the root diskette programs, then the 0.95 kernel
+sh /tmp/br build --apply      # make the root diskette programs, then the 0.95 kernel; gccsw 2.0 first (see ../0.12)
                               # B = boot.flp
 sh /tmp/br boot --apply       # dd Image to B
                               # B = root.flp
@@ -237,7 +237,7 @@ The disk follows the 0.95 VM: 128 cylinders, 16 heads, 63 sectors. gcc 2.0 needs
 
 Compressed, everything is about 1.7M, so it takes two floppies:
 
-- `gcc.flp`: the installer in the first 8 blocks (`inst.sh.in` with the block counts filled in), then a compressed tar: gcc 2.0 from the 0.12 hard disk (`/usr/local`), gccbin's as/ld and friends, libc-0.12 (as `/usr/local/lib/libc.a`), `/usr/include` (with the 0.95 kernel's `string.h`), `/usr/bin/make`, plus ShoeLace and `/Image` with `02 03` at offset 508
+- `gcc.flp`: the installer in the first 8 blocks (`inst.sh.in` with the block counts filled in), then a compressed tar: gcc 2.0 from the 0.12 hard disk (`/usr/local`; the driver is taken as `gcc-2.0` and symlinked to `gcc` on 0.95 by the installer), gccbin's as/ld and friends, libc-0.12 (as `/usr/local/lib/libc.a`), `/usr/include` (with the 0.95 kernel's `string.h`), `/usr/bin/make`, plus ShoeLace and `/Image` with `02 03` at offset 508
 - `tools.flp`: tools from the 0.12 `/usr/bin` that the root diskette lacks: grep egrep sed head tail cmp cut paste du split tac expand unexpand basename file stty uniq mkfifo dir vdir em kermit as86 ld86 and so on, plus gzip 1.1.1 built by build
 
 On 0.12 (B = br095.flp, sources unpacked and built):
